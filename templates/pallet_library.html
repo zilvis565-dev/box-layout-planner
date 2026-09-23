@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Pallet Library{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Pallet Library</h1>
+    </div>
+
+    <form method="post">
+        <div class="box-row">
+            <input type="text" name="name" placeholder="Pallet name" required>
+            <input type="number" name="length" placeholder="Length" required>
+            <input type="number" name="width" placeholder="Width" required>
+            <input type="number" name="height" placeholder="Height" required>
+            <input type="number" step="0.01" name="max_weight" placeholder="Max weight" required>
+        </div>
+        <button type="submit" class="btn">Save pallet</button>
+    </form>
+
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Length</th>
+            <th>Width</th>
+            <th>Height</th>
+            <th>Max weight</th>
+            <th>Action</th>
+        </tr>
+        {% for pallet in pallets %}
+        <tr>
+            <td>{{ pallet.name }}</td>
+            <td>{{ pallet.length }}</td>
+            <td>{{ pallet.width }}</td>
+            <td>{{ pallet.height }}</td>
+            <td>{{ pallet.max_weight }}</td>
+            <td>
+                <form method="post" action="{{ url_for('delete_pallet_library', pallet_id=pallet.id) }}" onsubmit="return confirm('Delete this pallet?');">
+                    <button type="submit" class="btn-small danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

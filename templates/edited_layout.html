@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Edited Layout{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h1>Edited Layout</h1>
+            <p class="subtitle">{{ plan.plan_name }} | {{ plan.pallet_type }}</p>
+        </div>
+        <a href="{{ url_for('plan_detail', plan_id=plan.id) }}" class="btn secondary">Back</a>
+    </div>
+
+    {% for pallet in editable_layout %}
+    <div class="card" style="margin-top:20px;">
+        <h2>Pallet {{ pallet.index }}</h2>
+        <table>
+            <tr>
+                <th>Box name</th>
+                <th>Qty</th>
+            </tr>
+            {% for name, qty in pallet.grouped_boxes.items() %}
+            <tr>
+                <td>{{ name }}</td>
+                <td>{{ qty }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

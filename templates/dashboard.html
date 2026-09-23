@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Saved Plans</h1>
+        <a href="{{ url_for('new_plan') }}" class="btn">+ New Plan</a>
+    </div>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Plan name</th>
+            <th>Pallet type</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+        {% for plan in plans %}
+        <tr>
+            <td>{{ plan.id }}</td>
+            <td>{{ plan.plan_name }}</td>
+            <td>{{ plan.pallet_type }}</td>
+            <td>{{ plan.created_at }}</td>
+            <td class="actions">
+                <a class="btn-small" href="{{ url_for('plan_detail', plan_id=plan.id) }}">Open</a>
+                <a class="btn-small secondary" href="{{ url_for('export_plan', plan_id=plan.id) }}">Export Excel</a>
+                <form method="post" action="{{ url_for('delete_plan', plan_id=plan.id) }}" onsubmit="return confirm('Delete this plan?');">
+                    <button type="submit" class="btn-small danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

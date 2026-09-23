@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Plan Detail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h1>{{ plan.plan_name }}</h1>
+            <p class="subtitle">Created: {{ plan.created_at }}</p>
+        </div>
+        <div class="actions">
+            <a href="{{ url_for('calculate_plan', plan_id=plan.id) }}" class="btn">Calculate Layout</a>
+            <a href="{{ url_for('export_plan', plan_id=plan.id) }}" class="btn secondary">Export Excel</a>
+        </div>
+    </div>
+
+    <div class="totals-box">
+        <div class="total-item">
+            <span class="total-label">Total boxes</span>
+            <span class="total-value">{{ total_boxes }}</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Total weight</span>
+            <span class="total-value">{{ total_weight }} kg</span>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h2>Loading settings</h2>
+        <table>
+            <tr>
+                <th>Loading target</th>
+                <th>Maximum load height</th>
+                <th>Overhang</th>
+                <th>Allow rotation</th>
+            </tr>
+            <tr>
+                <td>{{ plan.loading_target }}</td>
+                <td>{{ plan.max_load_height }}</td>
+                <td>{{ plan.overhang }}</td>
+                <td>{{ "Yes" if plan.allow_rotation else "No" }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h2>Allowed pallet types</h2>
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>Length</th>
+                <th>Width</th>
+                <th>Height</th>
+                <th>Max weight</th>
+            </tr>
+            {% for pallet in allowed_pallets %}
+            <tr>
+                <td>{{ pallet.name }}</td>
+                <td>{{ pallet.length }}</td>
+                <td>{{ pallet.width }}</td>
+                <td>{{ pallet.height }}</td>
+                <td>{{ pallet.max_weight }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h2>Boxes in plan</h2>
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>Length</th>
+                <th>Width</th>
+                <th>Height</th>
+                <th>Weight</th>
+                <th>Qty</th>
+            </tr>
+            {% for box in boxes %}
+            <tr>
+                <td>{{ box.box_name }}</td>
+                <td>{{ box.length }}</td>
+                <td>{{ box.width }}</td>
+                <td>{{ box.height }}</td>
+                <td>{{ box.weight }}</td>
+                <td>{{ box.qty }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}

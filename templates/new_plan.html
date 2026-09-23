@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}New Plan{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Create New Plan</h1>
+
+    <form method="post">
+        <label>Plan name</label>
+        <input type="text" name="plan_name" required>
+
+        <label>Loading target</label>
+        <select name="loading_target">
+            {% for target in loading_targets %}
+            <option value="{{ target }}">{{ target }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Maximum load height (mm)</label>
+        <input type="number" name="max_load_height" value="1800" required>
+
+        <label>Allowed pallet types</label>
+        <div class="card" style="padding:16px; margin-bottom:16px;">
+            {% for pallet in pallet_library %}
+            <label style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <input type="checkbox" name="allowed_pallets" value="{{ pallet.id }}" {% if loop.first %}checked{% endif %}>
+                <span>
+                    {{ pallet.name }} —
+                    {{ pallet.length }} x {{ pallet.width }} x {{ pallet.height }},
+                    max weight {{ pallet.max_weight }}
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <label>Allowed overhang (mm)</label>
+        <input type="number" name="overhang" value="0" required>
+
+        <label>Allow rotation</label>
+        <select name="allow_rotation">
+            <option value="yes" selected>Yes</option>
+            <option value="no">No</option>
+        </select>
+
+        <h2>Boxes</h2>
+        <div id="box-rows">
+            <div class="box-row">
+                <select class="library-select" onchange="fillBoxFromLibrary(this)">
+                    <option value="">Select saved box</option>
+                    {% for box in library_boxes %}
+                    <option value="{{ box.name }}"
+                            data-length="{{ box.length }}"
+                            data-width="{{ box.width }}"
+                            data-height="{{ box.height }}"
+                            data-weight="{{ box.weight }}">
+                        {{ box.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="box_name" placeholder="Box name" required>
+                <input type="number" name="box_length" placeholder="Length" required>
+                <input type="number" name="box_width" placeholder="Width" required>
+                <input type="number" name="box_height" placeholder="Height" required>
+                <input type="number" step="0.01" name="box_weight" placeholder="Weight" required>
+                <input type="number" name="box_qty" placeholder="Qty" required>
+            </div>
+        </div>
+
+        <button type="button" class="btn secondary" onclick="addBoxRow()">+ Add box row</button>
+        <button type="submit" class="btn full" style="margin-top:16px;">Save Plan</button>
+    </form>
+</div>
+
+<script>
+function fillBoxFromLibrary(selectEl) {
+    const row = selectEl.closest('.box-row');
+    const option = selectEl.options[selectEl.selectedIndex];
+    if (!option.value) return;
+
+    row.querySelector('input[name="box_name"]').value = option.value;
+    row.querySelector('input[name="box_length"]').value = option.getAttribute('data-length');
+    row.querySelector('input[name="box_width"]').value = option.getAttribute('data-width');
+    row.querySelector('input[name="box_height"]').value = option.getAttribute('data-height');
+    row.querySelector('input[name="box_weight"]').value = option.getAttribute('data-weight');
+}
+
+function addBoxRow() {
+    const container = document.getElementById("box-rows");
+    const row = document.createElement("div");
+    row.className = "box-row";
+    row.innerHTML = `
+        <select class="library-select" onchange="fillBoxFromLibrary(this)">
+            <option value="">Select saved box</option>
+            {% for box in library_boxes %}
+            <option value="{{ box.name }}"
+                    data-length="{{ box.length }}"
+                    data-width="{{ box.width }}"
+                    data-height="{{ box.height }}"
+                    data-weight="{{ box.weight }}">
+                {{ box.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <input type="text" name="box_name" placeholder="Box name" required>
+        <input type="number" name="box_length" placeholder="Length" required>
+        <input type="number" name="box_width" placeholder="Width" required>
+        <input type="number" name="box_height" placeholder="Height" required>
+        <input type="number" step="0.01" name="box_weight" placeholder="Weight" required>
+        <input type="number" name="box_qty" placeholder="Qty" required>
+    `;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

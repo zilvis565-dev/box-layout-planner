@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Box Layout Planner v2{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">Box Layout Planner v2</div>
+        <nav>
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('new_plan') }}">New Plan</a>
+            <a href="{{ url_for('box_library') }}">Box Library</a>
+            <a href="{{ url_for('pallet_library') }}">Pallet Library</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

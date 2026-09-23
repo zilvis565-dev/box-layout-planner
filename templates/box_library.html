@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Box Library{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Box Library</h1>
+    </div>
+
+    <form method="post">
+        <div class="box-row">
+            <input type="text" name="name" placeholder="Box name" required>
+            <input type="number" name="length" placeholder="Length" required>
+            <input type="number" name="width" placeholder="Width" required>
+            <input type="number" name="height" placeholder="Height" required>
+            <input type="number" step="0.01" name="weight" placeholder="Weight" required>
+            <button type="submit">Save</button>
+        </div>
+    </form>
+
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Length</th>
+            <th>Width</th>
+            <th>Height</th>
+            <th>Weight</th>
+            <th>Action</th>
+        </tr>
+        {% for box in boxes %}
+        <tr>
+            <td>{{ box.name }}</td>
+            <td>{{ box.length }}</td>
+            <td>{{ box.width }}</td>
+            <td>{{ box.height }}</td>
+            <td>{{ box.weight }}</td>
+            <td>
+                <form method="post" action="{{ url_for('delete_box', box_id=box.id) }}" onsubmit="return confirm('Delete this box?');">
+                    <button type="submit" class="btn-small danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
