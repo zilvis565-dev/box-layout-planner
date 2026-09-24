@@ -10,7 +10,7 @@ import math
 app = Flask(__name__)
 app.secret_key = "box-layout-secret"
 
-DB_NAME = "planner.db"
+DB_NAME = "/tmp/planner.db"
 
 BOX_COLORS = [
     "#3b82f6", "#22c55e", "#f59e0b", "#ef4444",
@@ -753,6 +753,10 @@ def plan_detail(plan_id):
         SELECT * FROM plans WHERE id = ?
     """, (plan_id,)).fetchone()
 
+    if not plan:
+        conn.close()
+        return redirect(url_for("dashboard"))
+
     boxes = conn.execute("""
         SELECT * FROM plan_boxes WHERE plan_id = ?
     """, (plan_id,)).fetchall()
@@ -787,6 +791,10 @@ def calculate_plan(plan_id):
     base_plan = conn.execute("""
         SELECT * FROM plans WHERE id = ?
     """, (plan_id,)).fetchone()
+
+    if not base_plan:
+        conn.close()
+        return redirect(url_for("dashboard"))
 
     boxes = conn.execute("""
         SELECT * FROM plan_boxes WHERE plan_id = ?
@@ -893,6 +901,11 @@ def show_edited_layout(plan_id):
     plan = conn.execute("""
         SELECT * FROM plans WHERE id = ?
     """, (plan_id,)).fetchone()
+
+    if not plan:
+        conn.close()
+        return redirect(url_for("dashboard"))
+
     conn.close()
 
     editable_layout = session.get("editable_layout", [])
@@ -922,6 +935,10 @@ def export_plan(plan_id):
     plan = conn.execute("""
         SELECT * FROM plans WHERE id = ?
     """, (plan_id,)).fetchone()
+
+    if not plan:
+        conn.close()
+        return redirect(url_for("dashboard"))
 
     boxes = conn.execute("""
         SELECT * FROM plan_boxes WHERE plan_id = ?
