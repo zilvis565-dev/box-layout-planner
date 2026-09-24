@@ -694,9 +694,25 @@ def calculate_plan(plan_id):
 
     unique_box_types = {box["box_name"] for box in boxes}
     single_box_debug = None
+    all_pallet_debug = []
 
     if len(unique_box_types) == 1:
         merged_box = merge_same_box_type_rows(boxes)
+
+        for pallet_row in allowed_pallets:
+            cap = single_box_capacity(base_plan, pallet_row, merged_box)
+            if cap:
+                all_pallet_debug.append({
+                    "pallet_name": pallet_row["name"],
+                    "status": "fit",
+                    **cap
+                })
+            else:
+                all_pallet_debug.append({
+                    "pallet_name": pallet_row["name"],
+                    "status": "no fit"
+                })
+
         strict_result = solve_single_box_type_strict(base_plan, allowed_pallets, merged_box)
 
         if strict_result:
@@ -752,7 +768,8 @@ def calculate_plan(plan_id):
         plan_id=plan_id,
         total_pallets=len(pallets),
         pallet_summaries=pallet_summaries,
-        single_box_debug=single_box_debug
+        single_box_debug=single_box_debug,
+        all_pallet_debug=all_pallet_debug
     )
 
 
