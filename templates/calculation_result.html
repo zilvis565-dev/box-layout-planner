@@ -25,16 +25,46 @@
     <div class="card" style="margin-top:20px;">
         <h2>Single box debug</h2>
         <table>
-            <tr><th>Selected pallet</th><td>{{ single_box_debug.pallet_type }}</td></tr>
-            <tr><th>Orientation</th><td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td></tr>
-            <tr><th>Effective length</th><td>{{ single_box_debug.effective_length }}</td></tr>
-            <tr><th>Effective width</th><td>{{ single_box_debug.effective_width }}</td></tr>
-            <tr><th>Usable height</th><td>{{ single_box_debug.usable_height }}</td></tr>
-            <tr><th>Per row</th><td>{{ single_box_debug.per_row }}</td></tr>
-            <tr><th>Per col</th><td>{{ single_box_debug.per_col }}</td></tr>
-            <tr><th>Per layer</th><td>{{ single_box_debug.per_layer }}</td></tr>
-            <tr><th>Layers</th><td>{{ single_box_debug.layers }}</td></tr>
-            <tr><th>Max per pallet</th><td>{{ single_box_debug.per_pallet }}</td></tr>
+            <tr>
+                <th>Selected pallet</th>
+                <td>{{ single_box_debug.pallet_type }}</td>
+            </tr>
+            <tr>
+                <th>Orientation</th>
+                <td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td>
+            </tr>
+            <tr>
+                <th>Effective length</th>
+                <td>{{ single_box_debug.effective_length }}</td>
+            </tr>
+            <tr>
+                <th>Effective width</th>
+                <td>{{ single_box_debug.effective_width }}</td>
+            </tr>
+            <tr>
+                <th>Usable height</th>
+                <td>{{ single_box_debug.usable_height }}</td>
+            </tr>
+            <tr>
+                <th>Per row</th>
+                <td>{{ single_box_debug.per_row }}</td>
+            </tr>
+            <tr>
+                <th>Per col</th>
+                <td>{{ single_box_debug.per_col }}</td>
+            </tr>
+            <tr>
+                <th>Per layer</th>
+                <td>{{ single_box_debug.per_layer }}</td>
+            </tr>
+            <tr>
+                <th>Layers</th>
+                <td>{{ single_box_debug.layers }}</td>
+            </tr>
+            <tr>
+                <th>Max per pallet</th>
+                <td>{{ single_box_debug.per_pallet }}</td>
+            </tr>
         </table>
     </div>
     {% endif %}
