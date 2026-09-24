@@ -21,9 +21,9 @@
         </div>
     </div>
 
-    {% if single_box_debug %}
-    <div class="card" style="margin-top:20px;">
-        <h2>Single box debug</h2>
+    <div class="card" style="margin-top:20px; border:2px solid #f59e0b;">
+        <h2>Debug block</h2>
+        {% if single_box_debug %}
         <table>
             <tr>
                 <th>Selected pallet</th>
@@ -66,8 +66,10 @@
                 <td>{{ single_box_debug.per_pallet }}</td>
             </tr>
         </table>
+        {% else %}
+        <p><strong>No single_box_debug data received.</strong></p>
+        {% endif %}
     </div>
-    {% endif %}
 
     <form method="post" action="{{ url_for('update_layout', plan_id=plan_id) }}">
         {% for pallet in pallet_summaries %}
