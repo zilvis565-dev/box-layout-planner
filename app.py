@@ -842,6 +842,8 @@ def calculate_plan(plan_id):
     pallet_summaries = []
     editable_summary = []
 
+    serialized_pallets = []
+
     for idx, pallet in enumerate(pallets, start=1):
         grouped = {}
         for box in pallet["boxes"]:
@@ -854,7 +856,6 @@ def calculate_plan(plan_id):
             "pallet_type": pallet["pallet_type"]
         })
 
-        plot_html, legend = create_3d_plot(pallet, selected_plan)
         base_util, volume_util = base_and_volume_utilization(pallet, selected_plan)
 
         pallet_summaries.append({
@@ -864,13 +865,16 @@ def calculate_plan(plan_id):
             "used_height": pallet["used_height"],
             "box_count": len(pallet["boxes"]),
             "grouped_boxes": grouped,
-            "plot_html": plot_html,
-            "legend": legend,
+            "legend": [],
             "base_layer_utilization": base_util,
             "volume_utilization": volume_util
         })
 
+        serialized_pallets.append(copy.deepcopy(pallet))
+
     session["editable_layout"] = editable_summary
+    session["last_calculated_pallets"] = serialized_pallets
+    session["last_selected_plan"] = dict(selected_plan)
 
     return render_template(
         "calculation_result.html",
@@ -878,6 +882,28 @@ def calculate_plan(plan_id):
         plan_id=plan_id,
         total_pallets=len(pallets),
         pallet_summaries=pallet_summaries
+    )
+
+
+@app.route("/pallet-3d/<int:plan_id>/<int:pallet_index>")
+def pallet_3d(plan_id, pallet_index):
+    pallets = session.get("last_calculated_pallets", [])
+    selected_plan = session.get("last_selected_plan")
+
+    if not selected_plan or pallet_index < 1 or pallet_index > len(pallets):
+        return redirect(url_for("plan_detail", plan_id=plan_id))
+
+    pallet = pallets[pallet_index - 1]
+    plot_html, legend = create_3d_plot(pallet, selected_plan)
+
+    return render_template(
+        "pallet_3d.html",
+        plan=selected_plan,
+        plan_id=plan_id,
+        pallet_index=pallet_index,
+        pallet=pallet,
+        plot_html=plot_html,
+        legend=legend
     )
 
 
