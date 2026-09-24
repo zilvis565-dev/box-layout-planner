@@ -342,6 +342,13 @@ def validate_pallet_overlaps(pallet):
     return overlaps
 
 
+def collides_with_existing(candidate_box, placed_boxes):
+    for existing in placed_boxes:
+        if boxes_overlap_3d(candidate_box, existing):
+            return True
+    return False
+
+
 def try_place_box_in_pallet(box, pallet, plan):
     effective_length = plan["pallet_length"] + 2 * plan["overhang"]
     effective_width = plan["pallet_width"] + 2 * plan["overhang"]
@@ -389,7 +396,7 @@ def try_place_box_in_pallet(box, pallet, plan):
                     layer_z + box["height"] <= max_height and
                     pallet["weight"] + box["weight"] <= max_weight
                 ):
-                    placed_box = {
+                    candidate_box = {
                         **box,
                         "placed_length": box_l,
                         "placed_width": box_w,
@@ -397,6 +404,9 @@ def try_place_box_in_pallet(box, pallet, plan):
                         "y": sy,
                         "z": layer_z
                     }
+
+                    if collides_with_existing(candidate_box, pallet["boxes"]):
+                        continue
 
                     new_spaces = free_spaces[:sidx] + free_spaces[sidx+1:]
                     right_space = (sx + box_l, sy, sw - box_l, box_w)
@@ -410,7 +420,7 @@ def try_place_box_in_pallet(box, pallet, plan):
                     new_spaces.sort(key=lambda s: s[2] * s[3], reverse=True)
                     pallet["layers"][idx]["free_spaces"] = new_spaces
 
-                    pallet["boxes"].append(placed_box)
+                    pallet["boxes"].append(candidate_box)
                     pallet["weight"] += box["weight"]
                     pallet["used_height"] = max(pallet["used_height"], layer_z + box["height"])
                     return True
@@ -426,19 +436,22 @@ def try_place_box_in_pallet(box, pallet, plan):
             box_l <= effective_length and
             box_w <= effective_width
         ):
-            new_layer = {
-                "z": current_top,
-                "height": box["height"],
-                "free_spaces": []
-            }
-
-            placed_box = {
+            candidate_box = {
                 **box,
                 "placed_length": box_l,
                 "placed_width": box_w,
                 "x": 0,
                 "y": 0,
                 "z": current_top
+            }
+
+            if collides_with_existing(candidate_box, pallet["boxes"]):
+                continue
+
+            new_layer = {
+                "z": current_top,
+                "height": box["height"],
+                "free_spaces": []
             }
 
             right_space = (box_l, 0, effective_length - box_l, box_w)
@@ -452,7 +465,7 @@ def try_place_box_in_pallet(box, pallet, plan):
             new_layer["free_spaces"].sort(key=lambda s: s[2] * s[3], reverse=True)
 
             pallet["layers"].append(new_layer)
-            pallet["boxes"].append(placed_box)
+            pallet["boxes"].append(candidate_box)
             pallet["weight"] += box["weight"]
             pallet["used_height"] = max(pallet["used_height"], current_top + box["height"])
             return True
