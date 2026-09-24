@@ -312,6 +312,36 @@ def single_box_type_distribution(base_plan, pallet_row, box):
     }
 
 
+def boxes_overlap_3d(a, b):
+    ax1, ay1, az1 = a["x"], a["y"], a["z"]
+    ax2 = ax1 + a["placed_length"]
+    ay2 = ay1 + a["placed_width"]
+    az2 = az1 + a["height"]
+
+    bx1, by1, bz1 = b["x"], b["y"], b["z"]
+    bx2 = bx1 + b["placed_length"]
+    by2 = by1 + b["placed_width"]
+    bz2 = bz1 + b["height"]
+
+    overlap_x = ax1 < bx2 and ax2 > bx1
+    overlap_y = ay1 < by2 and ay2 > by1
+    overlap_z = az1 < bz2 and az2 > bz1
+
+    return overlap_x and overlap_y and overlap_z
+
+
+def validate_pallet_overlaps(pallet):
+    overlaps = []
+    boxes = pallet["boxes"]
+
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            if boxes_overlap_3d(boxes[i], boxes[j]):
+                overlaps.append((i, j))
+
+    return overlaps
+
+
 def try_place_box_in_pallet(box, pallet, plan):
     effective_length = plan["pallet_length"] + 2 * plan["overhang"]
     effective_width = plan["pallet_width"] + 2 * plan["overhang"]
@@ -656,6 +686,12 @@ def create_3d_plot(pallet, base_plan):
     color_map = {}
     legend = []
 
+    overlaps = validate_pallet_overlaps(pallet)
+    overlap_indices = set()
+    for a, b in overlaps:
+        overlap_indices.add(a)
+        overlap_indices.add(b)
+
     px = 0
     py = 0
     pz = 0
@@ -677,7 +713,36 @@ def create_3d_plot(pallet, base_plan):
         showscale=False
     ))
 
-    for box in pallet["boxes"]:
+    def add_box_edges(x, y, z, dx, dy, dz, color):
+        corners = [
+            (x, y, z),
+            (x + dx, y, z),
+            (x + dx, y + dy, z),
+            (x, y + dy, z),
+            (x, y, z + dz),
+            (x + dx, y, z + dz),
+            (x + dx, y + dy, z + dz),
+            (x, y + dy, z + dz),
+        ]
+
+        edges = [
+            (0, 1), (1, 2), (2, 3), (3, 0),
+            (4, 5), (5, 6), (6, 7), (7, 4),
+            (0, 4), (1, 5), (2, 6), (3, 7)
+        ]
+
+        for a, b in edges:
+            fig.add_trace(go.Scatter3d(
+                x=[corners[a][0], corners[b][0]],
+                y=[corners[a][1], corners[b][1]],
+                z=[corners[a][2], corners[b][2]],
+                mode="lines",
+                line=dict(color=color, width=6),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+
+    for idx, box in enumerate(pallet["boxes"]):
         if box["box_name"] not in color_map:
             color_map[box["box_name"]] = BOX_COLORS[len(color_map) % len(BOX_COLORS)]
             legend.append({
@@ -685,7 +750,7 @@ def create_3d_plot(pallet, base_plan):
                 "color": color_map[box["box_name"]]
             })
 
-        color = color_map[box["box_name"]]
+        color = "#ff0000" if idx in overlap_indices else color_map[box["box_name"]]
 
         x = box["x"]
         y = box["y"]
@@ -695,18 +760,20 @@ def create_3d_plot(pallet, base_plan):
         dz = box["height"]
 
         fig.add_trace(go.Mesh3d(
-            x=[x, x+dx, x+dx, x, x, x+dx, x+dx, x],
-            y=[y, y, y+dy, y+dy, y, y, y+dy, y+dy],
-            z=[z, z, z, z, z+dz, z+dz, z+dz, z+dz],
-            i=[0, 0, 0, 1, 4, 4, 5, 2, 6, 3, 7, 1],
-            j=[1, 2, 3, 2, 5, 6, 6, 3, 7, 0, 4, 5],
-            k=[2, 3, 1, 0, 6, 7, 1, 0, 3, 4, 5, 6],
+            x=[x, x+dx, x+dx, x],
+            y=[y, y, y+dy, y+dy],
+            z=[z+dz, z+dz, z+dz, z+dz],
+            i=[0, 0],
+            j=[1, 2],
+            k=[2, 3],
             opacity=1.0,
             color=color,
             flatshading=True,
             name=box["box_name"],
             showscale=False
         ))
+
+        add_box_edges(x, y, z, dx, dy, dz, color)
 
     max_dim = max(plan["pallet_length"], plan["pallet_width"], plan["max_load_height"])
 
@@ -715,9 +782,9 @@ def create_3d_plot(pallet, base_plan):
             xaxis_title="Length",
             yaxis_title="Width",
             zaxis_title="Height",
-            xaxis=dict(range=[0, plan["pallet_length"]]),
-            yaxis=dict(range=[0, plan["pallet_width"]]),
-            zaxis=dict(range=[0, plan["max_load_height"]]),
+            xaxis=dict(range=[0, plan["pallet_length"]], showgrid=True, zeroline=False),
+            yaxis=dict(range=[0, plan["pallet_width"]], showgrid=True, zeroline=False),
+            zaxis=dict(range=[0, plan["max_load_height"]], showgrid=True, zeroline=False),
             aspectmode="manual",
             aspectratio=dict(
                 x=plan["pallet_length"] / max_dim,
@@ -736,7 +803,7 @@ def create_3d_plot(pallet, base_plan):
         showlegend=False
     )
 
-    return pio.to_html(fig, full_html=False), legend
+    return pio.to_html(fig, full_html=False), legend, overlaps
 
 
 @app.route("/")
@@ -1007,6 +1074,7 @@ def calculate_plan(plan_id):
         })
 
         base_util, volume_util = base_and_volume_utilization(pallet, selected_plan)
+        overlaps = validate_pallet_overlaps(pallet)
 
         pallet_summaries.append({
             "index": idx,
@@ -1016,7 +1084,8 @@ def calculate_plan(plan_id):
             "box_count": len(pallet["boxes"]),
             "grouped_boxes": grouped,
             "base_layer_utilization": base_util,
-            "volume_utilization": volume_util
+            "volume_utilization": volume_util,
+            "overlap_count": len(overlaps)
         })
 
         serialized_pallets.append(copy.deepcopy(pallet))
@@ -1043,7 +1112,7 @@ def pallet_3d(plan_id, pallet_index):
         return redirect(url_for("plan_detail", plan_id=plan_id))
 
     pallet = pallets[pallet_index - 1]
-    plot_html, legend = create_3d_plot(pallet, selected_plan)
+    plot_html, legend, overlaps = create_3d_plot(pallet, selected_plan)
 
     return render_template(
         "pallet_3d.html",
@@ -1052,7 +1121,8 @@ def pallet_3d(plan_id, pallet_index):
         pallet_index=pallet_index,
         pallet=pallet,
         plot_html=plot_html,
-        legend=legend
+        legend=legend,
+        overlaps=overlaps
     )
 
 
