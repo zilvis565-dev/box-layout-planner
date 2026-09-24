@@ -1,85 +1,35 @@
-{% extends "base.html" %}
-
-{% block title %}Calculation Result{% endblock %}
-
-{% block content %}
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h1>Calculation Result</h1>
-            <p class="subtitle">
-                Loading target: {{ plan.loading_target }}
-            </p>
-        </div>
-        <a href="{{ url_for('plan_detail', plan_id=plan_id) }}" class="btn secondary">Back</a>
-    </div>
-
-    <div class="totals-box">
-        <div class="total-item">
-            <span class="total-label">Total pallets needed</span>
-            <span class="total-value">{{ total_pallets }}</span>
-        </div>
-    </div>
-
-    <div class="card" style="margin-top:20px; border:2px solid #f59e0b;">
-        <h2>Debug block</h2>
-        {% if single_box_debug %}
-        <table>
-            <tr><th>Selected pallet</th><td>{{ single_box_debug.pallet_type }}</td></tr>
-            <tr><th>Orientation</th><td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td></tr>
-            <tr><th>Effective length</th><td>{{ single_box_debug.effective_length }}</td></tr>
-            <tr><th>Effective width</th><td>{{ single_box_debug.effective_width }}</td></tr>
-            <tr><th>Usable height</th><td>{{ single_box_debug.usable_height }}</td></tr>
-            <tr><th>Per row</th><td>{{ single_box_debug.per_row }}</td></tr>
-            <tr><th>Per col</th><td>{{ single_box_debug.per_col }}</td></tr>
-            <tr><th>Per layer</th><td>{{ single_box_debug.per_layer }}</td></tr>
-            <tr><th>Layers</th><td>{{ single_box_debug.layers }}</td></tr>
-            <tr><th>Max per pallet</th><td>{{ single_box_debug.per_pallet }}</td></tr>
-        </table>
-        {% else %}
-        <p><strong>No single_box_debug data received.</strong></p>
-        {% endif %}
-    </div>
-
-    <form method="post" action="{{ url_for('update_layout', plan_id=plan_id) }}">
-        {% for pallet in pallet_summaries %}
-        <div class="card" style="margin-top:20px;">
-            <h2>Pallet {{ pallet.index }}</h2>
-            <p>Pallet type: <strong>{{ pallet.pallet_type }}</strong></p>
-            <p>Boxes: <strong>{{ pallet.box_count }}</strong></p>
-            <p>Weight: <strong>{{ pallet.weight }} kg</strong></p>
-            <p>Used height: <strong>{{ pallet.used_height }} mm</strong></p>
-            <p>Base layer utilization: <strong>{{ pallet.base_layer_utilization }}%</strong></p>
-            <p>Volume utilization: <strong>{{ pallet.volume_utilization }}%</strong></p>
-            <p>Overlap count: <strong>{{ pallet.overlap_count }}</strong></p>
-
-            <table>
-                <tr>
-                    <th>Box name</th>
-                    <th>Qty on pallet</th>
-                </tr>
-                {% for name, qty in pallet.grouped_boxes.items() %}
-                <tr>
-                    <td>{{ name }}</td>
-                    <td>
-                        <input type="number"
-                               name="pallet_{{ pallet.index }}_{{ name }}"
-                               value="{{ qty }}"
-                               min="0">
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-
-            <div style="margin-top:16px;">
-                <a href="{{ url_for('pallet_3d', plan_id=plan_id, pallet_index=pallet.index) }}" class="btn">
-                    View 3D
-                </a>
-            </div>
-        </div>
+{% if all_pallet_debug %}
+<div class="card" style="margin-top:20px; border:2px solid #22c55e;">
+    <h2>All pallet debug</h2>
+    <table>
+        <tr>
+            <th>Pallet</th>
+            <th>Status</th>
+            <th>Orientation</th>
+            <th>Per row</th>
+            <th>Per col</th>
+            <th>Per layer</th>
+            <th>Layers</th>
+            <th>Per pallet</th>
+        </tr>
+        {% for row in all_pallet_debug %}
+        <tr>
+            <td>{{ row.pallet_name }}</td>
+            <td>{{ row.status }}</td>
+            <td>
+                {% if row.status == 'fit' %}
+                    {{ row.orientation[0] }} x {{ row.orientation[1] }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>{% if row.status == 'fit' %}{{ row.per_row }}{% else %}-{% endif %}</td>
+            <td>{% if row.status == 'fit' %}{{ row.per_col }}{% else %}-{% endif %}</td>
+            <td>{% if row.status == 'fit' %}{{ row.per_layer }}{% else %}-{% endif %}</td>
+            <td>{% if row.status == 'fit' %}{{ row.layers }}{% else %}-{% endif %}</td>
+            <td>{% if row.status == 'fit' %}{{ row.per_pallet }}{% else %}-{% endif %}</td>
+        </tr>
         {% endfor %}
-
-        <button type="submit" class="btn full" style="margin-top:20px;">Save edited layout</button>
-    </form>
+    </table>
 </div>
-{% endblock %}
+{% endif %}
