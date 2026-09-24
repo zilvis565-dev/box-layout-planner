@@ -190,69 +190,11 @@ def build_plan_from_pallet(base_plan, pallet_row):
     }
 
 
-def boxes_overlap_3d(a, b):
-    ax1, ay1, az1 = a["x"], a["y"], a["z"]
-    ax2 = ax1 + a["placed_length"]
-    ay2 = ay1 + a["placed_width"]
-    az2 = az1 + a["height"]
-
-    bx1, by1, bz1 = b["x"], b["y"], b["z"]
-    bx2 = bx1 + b["placed_length"]
-    by2 = by1 + b["placed_width"]
-    bz2 = bz1 + b["height"]
-
-    overlap_x = ax1 < bx2 and ax2 > bx1
-    overlap_y = ay1 < by2 and ay2 > by1
-    overlap_z = az1 < bz2 and az2 > bz1
-
-    return overlap_x and overlap_y and overlap_z
-
-
-def validate_pallet_overlaps(pallet):
-    overlaps = []
-    boxes = pallet["boxes"]
-
-    for i in range(len(boxes)):
-        for j in range(i + 1, len(boxes)):
-            if boxes_overlap_3d(boxes[i], boxes[j]):
-                overlaps.append((i, j))
-
-    return overlaps
-
-
-def collides_with_existing(candidate_box, placed_boxes):
-    for existing in placed_boxes:
-        if boxes_overlap_3d(candidate_box, existing):
-            return True
-    return False
-
-
-def fits_within_bounds(candidate_box, plan):
-    max_x = plan["pallet_length"] + 2 * plan["overhang"]
-    max_y = plan["pallet_width"] + 2 * plan["overhang"]
-    max_z = plan["max_load_height"]
-
-    x2 = candidate_box["x"] + candidate_box["placed_length"]
-    y2 = candidate_box["y"] + candidate_box["placed_width"]
-    z2 = candidate_box["z"] + candidate_box["height"]
-
-    if candidate_box["x"] < 0 or candidate_box["y"] < 0 or candidate_box["z"] < 0:
-        return False
-    if x2 > max_x:
-        return False
-    if y2 > max_y:
-        return False
-    if z2 > max_z:
-        return False
-
-    return True
-
-
 def merge_same_box_type_rows(boxes):
     if not boxes:
         return None
 
-    merged = {
+    return {
         "box_name": boxes[0]["box_name"],
         "length": boxes[0]["length"],
         "width": boxes[0]["width"],
@@ -260,7 +202,6 @@ def merge_same_box_type_rows(boxes):
         "weight": boxes[0]["weight"],
         "qty": sum(box["qty"] for box in boxes)
     }
-    return merged
 
 
 def single_box_capacity(base_plan, pallet_row, box):
@@ -371,12 +312,6 @@ def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
                             "z": z
                         }
 
-                        if not fits_within_bounds(candidate_box, plan):
-                            continue
-
-                        if collides_with_existing(candidate_box, pallet["boxes"]):
-                            continue
-
                         pallet["boxes"].append(candidate_box)
                         qty_left -= 1
 
@@ -408,341 +343,6 @@ def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
     return best_result
 
 
-def try_place_box_in_pallet(box, pallet, plan):
-    effective_length = plan["pallet_length"] + 2 * plan["overhang"]
-    effective_width = plan["pallet_width"] + 2 * plan["overhang"]
-    pallet_height = plan["pallet_height"]
-    max_height = plan["max_load_height"]
-    max_weight = plan["max_pallet_weight"]
-    allow_rotation = bool(plan["allow_rotation"])
-
-    if "boxes" not in pallet:
-        pallet["boxes"] = []
-    if "weight" not in pallet:
-        pallet["weight"] = 0
-    if "used_height" not in pallet:
-        pallet["used_height"] = pallet_height
-    if "layers" not in pallet:
-        pallet["layers"] = []
-    if "pallet_type" not in pallet:
-        pallet["pallet_type"] = plan["pallet_type"]
-    if "pallet_length" not in pallet:
-        pallet["pallet_length"] = plan["pallet_length"]
-    if "pallet_width" not in pallet:
-        pallet["pallet_width"] = plan["pallet_width"]
-    if "pallet_height" not in pallet:
-        pallet["pallet_height"] = plan["pallet_height"]
-    if "max_weight" not in pallet:
-        pallet["max_weight"] = plan["max_pallet_weight"]
-
-    orientations = [(box["length"], box["width"])]
-    if allow_rotation and box["length"] != box["width"]:
-        orientations.append((box["width"], box["length"]))
-
-    orientations.sort(key=lambda o: o[0] * o[1], reverse=True)
-
-    for idx, layer in enumerate(pallet["layers"]):
-        free_spaces = sorted(layer["free_spaces"], key=lambda s: s[2] * s[3], reverse=True)
-        layer_z = layer["z"]
-
-        for sidx, space in enumerate(free_spaces):
-            sx, sy, sw, sd = space
-
-            for box_l, box_w in orientations:
-                if (
-                    box_l <= sw and
-                    box_w <= sd and
-                    layer_z + box["height"] <= max_height and
-                    pallet["weight"] + box["weight"] <= max_weight
-                ):
-                    candidate_box = {
-                        **box,
-                        "placed_length": box_l,
-                        "placed_width": box_w,
-                        "x": sx,
-                        "y": sy,
-                        "z": layer_z
-                    }
-
-                    if not fits_within_bounds(candidate_box, plan):
-                        continue
-
-                    if collides_with_existing(candidate_box, pallet["boxes"]):
-                        continue
-
-                    new_spaces = free_spaces[:sidx] + free_spaces[sidx+1:]
-                    right_space = (sx + box_l, sy, sw - box_l, box_w)
-                    bottom_space = (sx, sy + box_w, sw, sd - box_w)
-
-                    if right_space[2] > 0 and right_space[3] > 0:
-                        new_spaces.append(right_space)
-                    if bottom_space[2] > 0 and bottom_space[3] > 0:
-                        new_spaces.append(bottom_space)
-
-                    new_spaces.sort(key=lambda s: s[2] * s[3], reverse=True)
-                    pallet["layers"][idx]["free_spaces"] = new_spaces
-
-                    pallet["boxes"].append(candidate_box)
-                    pallet["weight"] += box["weight"]
-                    pallet["used_height"] = max(pallet["used_height"], layer_z + box["height"])
-                    return True
-
-    current_top = pallet_height
-    if pallet["layers"]:
-        current_top = max(layer["z"] + layer["height"] for layer in pallet["layers"])
-
-    for box_l, box_w in orientations:
-        candidate_box = {
-            **box,
-            "placed_length": box_l,
-            "placed_width": box_w,
-            "x": 0,
-            "y": 0,
-            "z": current_top
-        }
-
-        if (
-            current_top + box["height"] <= max_height and
-            pallet["weight"] + box["weight"] <= max_weight and
-            box_l <= effective_length and
-            box_w <= effective_width and
-            fits_within_bounds(candidate_box, plan) and
-            not collides_with_existing(candidate_box, pallet["boxes"])
-        ):
-            new_layer = {
-                "z": current_top,
-                "height": box["height"],
-                "free_spaces": []
-            }
-
-            right_space = (box_l, 0, effective_length - box_l, box_w)
-            bottom_space = (0, box_w, effective_length, effective_width - box_w)
-
-            if right_space[2] > 0 and right_space[3] > 0:
-                new_layer["free_spaces"].append(right_space)
-            if bottom_space[2] > 0 and bottom_space[3] > 0:
-                new_layer["free_spaces"].append(bottom_space)
-
-            new_layer["free_spaces"].sort(key=lambda s: s[2] * s[3], reverse=True)
-
-            pallet["layers"].append(new_layer)
-            pallet["boxes"].append(candidate_box)
-            pallet["weight"] += box["weight"]
-            pallet["used_height"] = max(pallet["used_height"], current_top + box["height"])
-            return True
-
-    return False
-
-
-def base_and_volume_utilization(pallet, plan):
-    pallet_area = (pallet["pallet_length"] + 2 * plan["overhang"]) * (pallet["pallet_width"] + 2 * plan["overhang"])
-    base_z = min(box["z"] for box in pallet["boxes"]) if pallet["boxes"] else 0
-    base_used_area = sum(
-        box["placed_length"] * box["placed_width"]
-        for box in pallet["boxes"]
-        if box["z"] == base_z
-    )
-    base_util = round((base_used_area / pallet_area * 100), 2) if pallet_area > 0 else 0
-
-    pallet_volume = pallet_area * plan["max_load_height"]
-    used_volume = sum(
-        box["placed_length"] * box["placed_width"] * box["height"]
-        for box in pallet["boxes"]
-    )
-    volume_util = round((used_volume / pallet_volume * 100), 2) if pallet_volume > 0 else 0
-
-    return base_util, volume_util
-
-
-def pallet_score(pallet, plan):
-    base_util, volume_util = base_and_volume_utilization(pallet, plan)
-    height_ratio = pallet["used_height"] / plan["max_load_height"] if plan["max_load_height"] > 0 else 0
-    weight_ratio = pallet["weight"] / plan["max_pallet_weight"] if plan["max_pallet_weight"] > 0 else 0
-    return (base_util / 100) * 2 + (volume_util / 100) + height_ratio + weight_ratio
-
-
-def choose_best_new_pallet_for_box(box, base_plan, allowed_pallets):
-    best = None
-
-    for pallet_row in allowed_pallets:
-        pallet_plan = build_plan_from_pallet(base_plan, pallet_row)
-        new_pallet = {
-            "boxes": [],
-            "weight": 0,
-            "used_height": pallet_plan["pallet_height"],
-            "layers": [],
-            "pallet_type": pallet_plan["pallet_type"],
-            "pallet_length": pallet_plan["pallet_length"],
-            "pallet_width": pallet_plan["pallet_width"],
-            "pallet_height": pallet_plan["pallet_height"],
-            "max_weight": pallet_plan["max_pallet_weight"]
-        }
-
-        if try_place_box_in_pallet(box, new_pallet, pallet_plan):
-            score = pallet_score(new_pallet, pallet_plan)
-            candidate = {
-                "pallet": new_pallet,
-                "plan": pallet_plan,
-                "score": score
-            }
-
-            if best is None or candidate["score"] > best["score"]:
-                best = candidate
-
-    return best
-
-
-def choose_best_pallet_for_box_type(base_plan, allowed_pallets, box_row):
-    best = None
-    for pallet_row in allowed_pallets:
-        cap = single_box_capacity(base_plan, pallet_row, box_row)
-        if not cap:
-            continue
-
-        score = cap["per_pallet"]
-        candidate = {
-            "pallet_row": pallet_row,
-            "capacity": cap,
-            "score": score
-        }
-
-        if best is None or candidate["score"] > best["score"]:
-            best = candidate
-
-    return best
-
-
-def calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes):
-    grouped = defaultdict(lambda: {
-        "box_name": "",
-        "length": 0,
-        "width": 0,
-        "height": 0,
-        "weight": 0,
-        "qty": 0
-    })
-
-    for b in boxes:
-        grouped[b["box_name"]]["box_name"] = b["box_name"]
-        grouped[b["box_name"]]["length"] = b["length"]
-        grouped[b["box_name"]]["width"] = b["width"]
-        grouped[b["box_name"]]["height"] = b["height"]
-        grouped[b["box_name"]]["weight"] = b["weight"]
-        grouped[b["box_name"]]["qty"] += b["qty"]
-
-    grouped_boxes = sorted(
-        grouped.values(),
-        key=lambda x: (x["length"] * x["width"], x["qty"], x["weight"]),
-        reverse=True
-    )
-
-    pallets = []
-    leftovers = []
-
-    for box_row in grouped_boxes:
-        best_choice = choose_best_pallet_for_box_type(base_plan, allowed_pallets, box_row)
-
-        if not best_choice:
-            leftovers.append(box_row)
-            continue
-
-        best_pallet_row = best_choice["pallet_row"]
-        cap = best_choice["capacity"]["per_pallet"]
-
-        if cap <= 0:
-            leftovers.append(box_row)
-            continue
-
-        full_pallet_count = box_row["qty"] // cap
-        remainder = box_row["qty"] % cap
-
-        if full_pallet_count > 0:
-            result = solve_single_box_type_strict(base_plan, [best_pallet_row], {
-                "box_name": box_row["box_name"],
-                "length": box_row["length"],
-                "width": box_row["width"],
-                "height": box_row["height"],
-                "weight": box_row["weight"],
-                "qty": full_pallet_count * cap
-            })
-            if result:
-                pallets.extend(result["pallets"])
-
-        if remainder > 0:
-            leftovers.append({
-                "box_name": box_row["box_name"],
-                "length": box_row["length"],
-                "width": box_row["width"],
-                "height": box_row["height"],
-                "weight": box_row["weight"],
-                "qty": remainder
-            })
-
-    expanded_leftovers = expand_boxes(leftovers)
-
-    for box in expanded_leftovers:
-        best_existing_index = None
-        best_existing_score = -1
-
-        for idx, pallet in enumerate(pallets):
-            pallet_plan = {
-                "pallet_type": pallet["pallet_type"],
-                "pallet_length": pallet["pallet_length"],
-                "pallet_width": pallet["pallet_width"],
-                "pallet_height": pallet["pallet_height"],
-                "max_load_height": base_plan["max_load_height"],
-                "max_pallet_weight": pallet["max_weight"],
-                "overhang": base_plan["overhang"],
-                "allow_rotation": base_plan["allow_rotation"],
-                "loading_target": base_plan["loading_target"]
-            }
-
-            test_pallet = copy.deepcopy(pallet)
-            if try_place_box_in_pallet(box, test_pallet, pallet_plan):
-                score = pallet_score(test_pallet, pallet_plan)
-                if score > best_existing_score:
-                    best_existing_score = score
-                    best_existing_index = idx
-
-        best_new = choose_best_new_pallet_for_box(box, base_plan, allowed_pallets)
-
-        if best_existing_index is not None and best_new is not None:
-            if best_existing_score >= best_new["score"]:
-                chosen_pallet = pallets[best_existing_index]
-                chosen_plan = {
-                    "pallet_type": chosen_pallet["pallet_type"],
-                    "pallet_length": chosen_pallet["pallet_length"],
-                    "pallet_width": chosen_pallet["pallet_width"],
-                    "pallet_height": chosen_pallet["pallet_height"],
-                    "max_load_height": base_plan["max_load_height"],
-                    "max_pallet_weight": chosen_pallet["max_weight"],
-                    "overhang": base_plan["overhang"],
-                    "allow_rotation": base_plan["allow_rotation"],
-                    "loading_target": base_plan["loading_target"]
-                }
-                try_place_box_in_pallet(box, chosen_pallet, chosen_plan)
-            else:
-                pallets.append(best_new["pallet"])
-        elif best_existing_index is not None:
-            chosen_pallet = pallets[best_existing_index]
-            chosen_plan = {
-                "pallet_type": chosen_pallet["pallet_type"],
-                "pallet_length": chosen_pallet["pallet_length"],
-                "pallet_width": chosen_pallet["pallet_width"],
-                "pallet_height": chosen_pallet["pallet_height"],
-                "max_load_height": base_plan["max_load_height"],
-                "max_pallet_weight": chosen_pallet["max_weight"],
-                "overhang": base_plan["overhang"],
-                "allow_rotation": base_plan["allow_rotation"],
-                "loading_target": base_plan["loading_target"]
-            }
-            try_place_box_in_pallet(box, chosen_pallet, chosen_plan)
-        elif best_new is not None:
-            pallets.append(best_new["pallet"])
-
-    return pallets
-
-
 def create_3d_plot(pallet, base_plan):
     plan = {
         "pallet_length": pallet["pallet_length"],
@@ -755,12 +355,6 @@ def create_3d_plot(pallet, base_plan):
     fig = go.Figure()
     color_map = {}
     legend = []
-
-    overlaps = validate_pallet_overlaps(pallet)
-    overlap_indices = set()
-    for a, b in overlaps:
-        overlap_indices.add(a)
-        overlap_indices.add(b)
 
     px = 0
     py = 0
@@ -812,7 +406,7 @@ def create_3d_plot(pallet, base_plan):
                 hoverinfo="skip"
             ))
 
-    for idx, box in enumerate(pallet["boxes"]):
+    for box in pallet["boxes"]:
         if box["box_name"] not in color_map:
             color_map[box["box_name"]] = BOX_COLORS[len(color_map) % len(BOX_COLORS)]
             legend.append({
@@ -820,7 +414,7 @@ def create_3d_plot(pallet, base_plan):
                 "color": color_map[box["box_name"]]
             })
 
-        color = "#ff0000" if idx in overlap_indices else color_map[box["box_name"]]
+        color = color_map[box["box_name"]]
 
         x = box["x"]
         y = box["y"]
@@ -873,7 +467,7 @@ def create_3d_plot(pallet, base_plan):
         showlegend=False
     )
 
-    return pio.to_html(fig, full_html=False), legend, overlaps
+    return pio.to_html(fig, full_html=False), legend, []
 
 
 @app.route("/")
@@ -1113,8 +707,8 @@ def calculate_plan(plan_id):
             selected_plan = base_plan
             pallets = []
     else:
-        pallets = calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes)
         selected_plan = base_plan
+        pallets = []
 
     pallet_summaries = []
     editable_summary = []
@@ -1133,7 +727,6 @@ def calculate_plan(plan_id):
         })
 
         base_util, volume_util = base_and_volume_utilization(pallet, selected_plan)
-        overlaps = validate_pallet_overlaps(pallet)
 
         pallet_summaries.append({
             "index": idx,
@@ -1144,7 +737,7 @@ def calculate_plan(plan_id):
             "grouped_boxes": grouped,
             "base_layer_utilization": base_util,
             "volume_utilization": volume_util,
-            "overlap_count": len(overlaps)
+            "overlap_count": 0
         })
 
         serialized_pallets.append(copy.deepcopy(pallet))
