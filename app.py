@@ -4,9 +4,8 @@ from datetime import datetime
 from openpyxl import Workbook
 import plotly.graph_objects as go
 import plotly.io as pio
-import copy
 import math
-from collections import defaultdict
+import copy
 
 app = Flask(__name__)
 app.secret_key = "box-layout-secret"
@@ -115,9 +114,10 @@ def init_db():
     """)
 
     for pallet in DEFAULT_PALLETS:
-        existing = c.execute("""
-            SELECT id FROM pallet_library WHERE name = ?
-        """, (pallet["name"],)).fetchone()
+        existing = c.execute(
+            "SELECT id FROM pallet_library WHERE name = ?",
+            (pallet["name"],)
+        ).fetchone()
 
         if not existing:
             c.execute("""
@@ -132,9 +132,10 @@ def init_db():
             ))
 
     for box in DEFAULT_BOXES:
-        existing = c.execute("""
-            SELECT id FROM box_library WHERE name = ?
-        """, (box["name"],)).fetchone()
+        existing = c.execute(
+            "SELECT id FROM box_library WHERE name = ?",
+            (box["name"],)
+        ).fetchone()
 
         if not existing:
             c.execute("""
@@ -275,7 +276,7 @@ def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
                         x = col * bl
                         y = row * bw
 
-                        candidate_box = {
+                        pallet["boxes"].append({
                             "box_name": merged_box["box_name"],
                             "length": merged_box["length"],
                             "width": merged_box["width"],
@@ -286,13 +287,8 @@ def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
                             "x": x,
                             "y": y,
                             "z": z
-                        }
-
-                        pallet["boxes"].append(candidate_box)
+                        })
                         qty_left -= 1
-
-                    if qty_left <= 0:
-                        break
 
                 pallet["used_height"] = max(pallet["used_height"], z + merged_box["height"])
                 z += merged_box["height"]
@@ -310,7 +306,6 @@ def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
         else:
             current_count = len(result["pallets"])
             best_count = len(best_result["pallets"])
-
             if current_count < best_count:
                 best_result = result
             elif current_count == best_count and cap["per_pallet"] > best_result["debug"]["per_pallet"]:
@@ -466,175 +461,6 @@ def create_3d_plot(pallet, base_plan):
     return pio.to_html(fig, full_html=False), legend, []
 
 
-@app.route("/")
-def dashboard():
-    conn = get_conn()
-    plans = conn.execute("SELECT * FROM plans ORDER BY id DESC").fetchall()
-    conn.close()
-    return render_template("dashboard.html", plans=plans)
-
-
-@app.route("/box-library", methods=["GET", "POST"])
-def box_library():
-    conn = get_conn()
-
-    if request.method == "POST":
-        conn.execute("""
-            INSERT INTO box_library (name, length, width, height, weight)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            request.form["name"],
-            int(request.form["length"]),
-            int(request.form["width"]),
-            int(request.form["height"]),
-            float(request.form["weight"])
-        ))
-        conn.commit()
-        return redirect(url_for("box_library"))
-
-    boxes = conn.execute("SELECT * FROM box_library ORDER BY name").fetchall()
-    conn.close()
-    return render_template("box_library.html", boxes=boxes)
-
-
-@app.route("/pallet-library", methods=["GET", "POST"])
-def pallet_library():
-    conn = get_conn()
-
-    if request.method == "POST":
-        conn.execute("""
-            INSERT INTO pallet_library (name, length, width, height, max_weight)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            request.form["name"],
-            int(request.form["length"]),
-            int(request.form["width"]),
-            int(request.form["height"]),
-            float(request.form["max_weight"])
-        ))
-        conn.commit()
-        return redirect(url_for("pallet_library"))
-
-    pallets = conn.execute("SELECT * FROM pallet_library ORDER BY name").fetchall()
-    conn.close()
-    return render_template("pallet_library.html", pallets=pallets)
-
-
-@app.route("/delete-box/<int:box_id>", methods=["POST"])
-def delete_box(box_id):
-    conn = get_conn()
-    conn.execute("DELETE FROM box_library WHERE id = ?", (box_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for("box_library"))
-
-
-@app.route("/delete-pallet-library/<int:pallet_id>", methods=["POST"])
-def delete_pallet_library(pallet_id):
-    conn = get_conn()
-    conn.execute("DELETE FROM pallet_library WHERE id = ?", (pallet_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for("pallet_library"))
-
-
-@app.route("/new-plan", methods=["GET", "POST"])
-def new_plan():
-    conn = get_conn()
-    library_boxes = conn.execute("SELECT * FROM box_library ORDER BY name").fetchall()
-    pallet_library_rows = conn.execute("SELECT * FROM pallet_library ORDER BY name").fetchall()
-
-    if request.method == "POST":
-        c = conn.cursor()
-        c.execute("""
-            INSERT INTO plans (
-                plan_name, loading_target, max_load_height, overhang, allow_rotation, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            request.form["plan_name"],
-            request.form["loading_target"],
-            int(request.form["max_load_height"]),
-            int(request.form["overhang"]),
-            1 if request.form.get("allow_rotation") == "yes" else 0,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
-        plan_id = c.lastrowid
-
-        for pallet_id in request.form.getlist("allowed_pallets"):
-            conn.execute("""
-                INSERT INTO plan_allowed_pallets (plan_id, pallet_library_id)
-                VALUES (?, ?)
-            """, (plan_id, int(pallet_id)))
-
-        names = request.form.getlist("box_name")
-        lengths = request.form.getlist("box_length")
-        widths = request.form.getlist("box_width")
-        heights = request.form.getlist("box_height")
-        weights = request.form.getlist("box_weight")
-        qtys = request.form.getlist("box_qty")
-
-        for i in range(len(names)):
-            if names[i].strip():
-                conn.execute("""
-                    INSERT INTO plan_boxes (
-                        plan_id, box_name, length, width, height, weight, qty
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    plan_id,
-                    names[i].strip(),
-                    int(lengths[i]),
-                    int(widths[i]),
-                    int(heights[i]),
-                    float(weights[i]),
-                    int(qtys[i])
-                ))
-
-        conn.commit()
-        conn.close()
-        return redirect(url_for("plan_detail", plan_id=plan_id))
-
-    conn.close()
-    return render_template(
-        "new_plan.html",
-        library_boxes=library_boxes,
-        pallet_library=pallet_library_rows,
-        loading_targets=LOADING_TARGETS
-    )
-
-
-@app.route("/plan/<int:plan_id>")
-def plan_detail(plan_id):
-    conn = get_conn()
-    plan = conn.execute("SELECT * FROM plans WHERE id = ?", (plan_id,)).fetchone()
-
-    if not plan:
-        conn.close()
-        return redirect(url_for("dashboard"))
-
-    boxes = conn.execute("SELECT * FROM plan_boxes WHERE plan_id = ?", (plan_id,)).fetchall()
-    allowed_pallets = conn.execute("""
-        SELECT pallet_library.*
-        FROM plan_allowed_pallets
-        JOIN pallet_library ON plan_allowed_pallets.pallet_library_id = pallet_library.id
-        WHERE plan_allowed_pallets.plan_id = ?
-        ORDER BY pallet_library.name
-    """, (plan_id,)).fetchall()
-
-    total_boxes = sum(box["qty"] for box in boxes)
-    total_weight = sum(box["qty"] * box["weight"] for box in boxes)
-
-    conn.close()
-
-    return render_template(
-        "plan_detail.html",
-        plan=plan,
-        boxes=boxes,
-        allowed_pallets=allowed_pallets,
-        total_boxes=total_boxes,
-        total_weight=round(total_weight, 2)
-    )
-
-
 @app.route("/calculate-plan/<int:plan_id>")
 def calculate_plan(plan_id):
     conn = get_conn()
@@ -658,6 +484,8 @@ def calculate_plan(plan_id):
     unique_box_types = {box["box_name"] for box in boxes}
     single_box_debug = None
     all_pallet_debug = []
+    pallets = []
+    selected_plan = base_plan
 
     if len(unique_box_types) == 1:
         merged_box = merge_same_box_type_rows(boxes)
@@ -682,12 +510,6 @@ def calculate_plan(plan_id):
             selected_plan = strict_result["plan"]
             pallets = strict_result["pallets"]
             single_box_debug = strict_result["debug"]
-        else:
-            selected_plan = base_plan
-            pallets = []
-    else:
-        selected_plan = base_plan
-        pallets = []
 
     pallet_summaries = []
     editable_summary = []
@@ -696,8 +518,7 @@ def calculate_plan(plan_id):
     for idx, pallet in enumerate(pallets, start=1):
         grouped = {}
         for box in pallet["boxes"]:
-            name = box["box_name"]
-            grouped[name] = grouped.get(name, 0) + 1
+            grouped[box["box_name"]] = grouped.get(box["box_name"], 0) + 1
 
         editable_summary.append({
             "index": idx,
