@@ -1,1 +1,88 @@
+{% extends "base.html" %}
 
+{% block title %}Technical View{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h1>Pallet {{ pallet_index }} - Technical View</h1>
+            <p class="subtitle">{{ pallet.pallet_type }}</p>
+        </div>
+        <a href="{{ url_for('calculate_plan', plan_id=plan_id) }}" class="btn secondary">Back</a>
+    </div>
+
+    <div class="totals-box">
+        <div class="total-item">
+            <span class="total-label">Pallet size</span>
+            <span class="total-value">{{ pallet.pallet_length }} x {{ pallet.pallet_width }}</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Used height</span>
+            <span class="total-value">{{ pallet.used_height }} mm</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Weight</span>
+            <span class="total-value">{{ pallet.weight }} kg</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Boxes</span>
+            <span class="total-value">{{ pallet.boxes|length }}</span>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h2>Top/technical layout</h2>
+        <div style="position:relative; overflow:auto; background:#0f172a; padding:20px; border-radius:12px;">
+            {% set scale = 0.35 %}
+            <div style="
+                position:relative;
+                width: {{ (pallet.pallet_length * scale)|int }}px;
+                height: {{ (pallet.pallet_width * scale)|int }}px;
+                border: 3px solid #e5e7eb;
+                background: #1e293b;
+            ">
+                {% for box in pallet.boxes %}
+                <div style="
+                    position:absolute;
+                    left: {{ (box.x * scale)|int }}px;
+                    top: {{ (box.y * scale)|int }}px;
+                    width: {{ (box.placed_length * scale)|int }}px;
+                    height: {{ (box.placed_width * scale)|int }}px;
+                    background:
+                        {% set colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#eab308','#14b8a6','#f97316','#84cc16'] %}
+                        {{ colors[loop.index0 % 10] }};
+                    border: 1px solid #0b1020;
+                    color: white;
+                    font-size: 10px;
+                    overflow: hidden;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    text-align:center;
+                    opacity: 0.9;
+                ">
+                    {{ box.box_name }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+        <h2>Box summary</h2>
+        <table>
+            <tr>
+                <th>Box name</th>
+                <th>Qty</th>
+            </tr>
+            {% for name, qty in pallet.grouped_boxes.items() %}
+            <tr>
+                <td>{{ name }}</td>
+                <td>{{ qty }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endblock %}
