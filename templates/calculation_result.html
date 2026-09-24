@@ -21,6 +21,24 @@
         </div>
     </div>
 
+    {% if single_box_debug %}
+    <div class="card" style="margin-top:20px;">
+        <h2>Single box debug</h2>
+        <table>
+            <tr><th>Selected pallet</th><td>{{ single_box_debug.pallet_type }}</td></tr>
+            <tr><th>Orientation</th><td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td></tr>
+            <tr><th>Effective length</th><td>{{ single_box_debug.effective_length }}</td></tr>
+            <tr><th>Effective width</th><td>{{ single_box_debug.effective_width }}</td></tr>
+            <tr><th>Usable height</th><td>{{ single_box_debug.usable_height }}</td></tr>
+            <tr><th>Per row</th><td>{{ single_box_debug.per_row }}</td></tr>
+            <tr><th>Per col</th><td>{{ single_box_debug.per_col }}</td></tr>
+            <tr><th>Per layer</th><td>{{ single_box_debug.per_layer }}</td></tr>
+            <tr><th>Layers</th><td>{{ single_box_debug.layers }}</td></tr>
+            <tr><th>Max per pallet</th><td>{{ single_box_debug.per_pallet }}</td></tr>
+        </table>
+    </div>
+    {% endif %}
+
     <form method="post" action="{{ url_for('update_layout', plan_id=plan_id) }}">
         {% for pallet in pallet_summaries %}
         <div class="card" style="margin-top:20px;">
@@ -31,6 +49,7 @@
             <p>Used height: <strong>{{ pallet.used_height }} mm</strong></p>
             <p>Base layer utilization: <strong>{{ pallet.base_layer_utilization }}%</strong></p>
             <p>Volume utilization: <strong>{{ pallet.volume_utilization }}%</strong></p>
+            <p>Overlap count: <strong>{{ pallet.overlap_count }}</strong></p>
 
             <table>
                 <tr>
@@ -61,40 +80,4 @@
         <button type="submit" class="btn full" style="margin-top:20px;">Save edited layout</button>
     </form>
 </div>
-{% if single_box_debug %}
-<div class="card" style="margin-top:20px;">
-    <h2>Single box debug</h2>
-    <table>
-        <tr><th>Selected pallet</th><td>{{ single_box_debug.pallet_type }}</td></tr>
-        <tr><th>Orientation</th><td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td></tr>
-        <tr><th>Effective length</th><td>{{ single_box_debug.effective_length }}</td></tr>
-        <tr><th>Effective width</th><td>{{ single_box_debug.effective_width }}</td></tr>
-        <tr><th>Usable height</th><td>{{ single_box_debug.usable_height }}</td></tr>
-        <tr><th>Per row</th><td>{{ single_box_debug.per_row }}</td></tr>
-        <tr><th>Per col</th><td>{{ single_box_debug.per_col }}</td></tr>
-        <tr><th>Per layer</th><td>{{ single_box_debug.per_layer }}</td></tr>
-        <tr><th>Layers</th><td>{{ single_box_debug.layers }}</td></tr>
-        <tr><th>Max per pallet</th><td>{{ single_box_debug.per_pallet }}</td></tr>
-    </table>
-</div>
-{% if single_box_debug %}
-<div class="card" style="margin-top:20px;">
-    <h2>Single box debug</h2>
-    <table>
-        <tr><th>Selected pallet</th><td>{{ single_box_debug.pallet_type }}</td></tr>
-        <tr><th>Orientation</th><td>{{ single_box_debug.orientation[0] }} x {{ single_box_debug.orientation[1] }}</td></tr>
-        <tr><th>Effective length</th><td>{{ single_box_debug.effective_length }}</td></tr>
-        <tr><th>Effective width</th><td>{{ single_box_debug.effective_width }}</td></tr>
-        <tr><th>Usable height</th><td>{{ single_box_debug.usable_height }}</td></tr>
-        <tr><th>Per row</th><td>{{ single_box_debug.per_row }}</td></tr>
-        <tr><th>Per col</th><td>{{ single_box_debug.per_col }}</td></tr>
-        <tr><th>Per layer</th><td>{{ single_box_debug.per_layer }}</td></tr>
-        <tr><th>Layers</th><td>{{ single_box_debug.layers }}</td></tr>
-        <tr><th>Max per pallet</th><td>{{ single_box_debug.per_pallet }}</td></tr>
-    </table>
-</div>
-{% endif %}
-
-
-
 {% endblock %}
