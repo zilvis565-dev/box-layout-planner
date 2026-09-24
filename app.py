@@ -281,7 +281,7 @@ def single_box_type_distribution(base_plan, pallet_row, box):
                     if count >= layer_count:
                         break
 
-                    pallet["boxes"].append({
+                    candidate_box = {
                         "box_name": box["box_name"],
                         "length": box["length"],
                         "width": box["width"],
@@ -292,7 +292,9 @@ def single_box_type_distribution(base_plan, pallet_row, box):
                         "x": x,
                         "y": y,
                         "z": z
-                    })
+                    }
+
+                    pallet["boxes"].append(candidate_box)
 
                     x += bl
                     count += 1
@@ -347,6 +349,28 @@ def collides_with_existing(candidate_box, placed_boxes):
         if boxes_overlap_3d(candidate_box, existing):
             return True
     return False
+
+
+def fits_within_bounds(candidate_box, plan):
+    max_x = plan["pallet_length"] + 2 * plan["overhang"]
+    max_y = plan["pallet_width"] + 2 * plan["overhang"]
+    max_z = plan["max_load_height"]
+
+    x2 = candidate_box["x"] + candidate_box["placed_length"]
+    y2 = candidate_box["y"] + candidate_box["placed_width"]
+    z2 = candidate_box["z"] + candidate_box["height"]
+
+    if candidate_box["x"] < 0 or candidate_box["y"] < 0 or candidate_box["z"] < 0:
+        return False
+
+    if x2 > max_x:
+        return False
+    if y2 > max_y:
+        return False
+    if z2 > max_z:
+        return False
+
+    return True
 
 
 def try_place_box_in_pallet(box, pallet, plan):
@@ -405,6 +429,9 @@ def try_place_box_in_pallet(box, pallet, plan):
                         "z": layer_z
                     }
 
+                    if not fits_within_bounds(candidate_box, plan):
+                        continue
+
                     if collides_with_existing(candidate_box, pallet["boxes"]):
                         continue
 
@@ -430,24 +457,23 @@ def try_place_box_in_pallet(box, pallet, plan):
         current_top = max(layer["z"] + layer["height"] for layer in pallet["layers"])
 
     for box_l, box_w in orientations:
+        candidate_box = {
+            **box,
+            "placed_length": box_l,
+            "placed_width": box_w,
+            "x": 0,
+            "y": 0,
+            "z": current_top
+        }
+
         if (
             current_top + box["height"] <= max_height and
             pallet["weight"] + box["weight"] <= max_weight and
             box_l <= effective_length and
-            box_w <= effective_width
+            box_w <= effective_width and
+            fits_within_bounds(candidate_box, plan) and
+            not collides_with_existing(candidate_box, pallet["boxes"])
         ):
-            candidate_box = {
-                **box,
-                "placed_length": box_l,
-                "placed_width": box_w,
-                "x": 0,
-                "y": 0,
-                "z": current_top
-            }
-
-            if collides_with_existing(candidate_box, pallet["boxes"]):
-                continue
-
             new_layer = {
                 "z": current_top,
                 "height": box["height"],
