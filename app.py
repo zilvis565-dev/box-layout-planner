@@ -362,7 +362,6 @@ def fits_within_bounds(candidate_box, plan):
 
     if candidate_box["x"] < 0 or candidate_box["y"] < 0 or candidate_box["z"] < 0:
         return False
-
     if x2 > max_x:
         return False
     if y2 > max_y:
@@ -752,6 +751,35 @@ def create_3d_plot(pallet, base_plan):
         showscale=False
     ))
 
+    def add_box_edges(x, y, z, dx, dy, dz, color):
+        corners = [
+            (x, y, z),
+            (x + dx, y, z),
+            (x + dx, y + dy, z),
+            (x, y + dy, z),
+            (x, y, z + dz),
+            (x + dx, y, z + dz),
+            (x + dx, y + dy, z + dz),
+            (x, y + dy, z + dz),
+        ]
+
+        edges = [
+            (0, 1), (1, 2), (2, 3), (3, 0),
+            (4, 5), (5, 6), (6, 7), (7, 4),
+            (0, 4), (1, 5), (2, 6), (3, 7)
+        ]
+
+        for a, b in edges:
+            fig.add_trace(go.Scatter3d(
+                x=[corners[a][0], corners[b][0]],
+                y=[corners[a][1], corners[b][1]],
+                z=[corners[a][2], corners[b][2]],
+                mode="lines",
+                line=dict(color=color, width=7),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+
     for idx, box in enumerate(pallet["boxes"]):
         if box["box_name"] not in color_map:
             color_map[box["box_name"]] = BOX_COLORS[len(color_map) % len(BOX_COLORS)]
@@ -770,18 +798,20 @@ def create_3d_plot(pallet, base_plan):
         dz = box["height"]
 
         fig.add_trace(go.Mesh3d(
-            x=[x, x+dx, x+dx, x, x, x+dx, x+dx, x],
-            y=[y, y, y+dy, y+dy, y, y, y+dy, y+dy],
-            z=[z, z, z, z, z+dz, z+dz, z+dz, z+dz],
-            i=[0, 0, 0, 1, 4, 4, 5, 2, 6, 3, 7, 1],
-            j=[1, 2, 3, 2, 5, 6, 6, 3, 7, 0, 4, 5],
-            k=[2, 3, 1, 0, 6, 7, 1, 0, 3, 4, 5, 6],
+            x=[x, x+dx, x+dx, x],
+            y=[y, y, y+dy, y+dy],
+            z=[z+dz, z+dz, z+dz, z+dz],
+            i=[0, 0],
+            j=[1, 2],
+            k=[2, 3],
             opacity=1.0,
             color=color,
             flatshading=True,
             name=box["box_name"],
             showscale=False
         ))
+
+        add_box_edges(x, y, z, dx, dy, dz, color)
 
     max_dim = max(plan["pallet_length"], plan["pallet_width"], plan["max_load_height"])
 
