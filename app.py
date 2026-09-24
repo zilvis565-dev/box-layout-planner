@@ -281,7 +281,7 @@ def single_box_type_distribution(base_plan, pallet_row, box):
                     if count >= layer_count:
                         break
 
-                    candidate_box = {
+                    pallet["boxes"].append({
                         "box_name": box["box_name"],
                         "length": box["length"],
                         "width": box["width"],
@@ -292,9 +292,7 @@ def single_box_type_distribution(base_plan, pallet_row, box):
                         "x": x,
                         "y": y,
                         "z": z
-                    }
-
-                    pallet["boxes"].append(candidate_box)
+                    })
 
                     x += bl
                     count += 1
@@ -370,6 +368,21 @@ def fits_within_bounds(candidate_box, plan):
         return False
 
     return True
+
+
+def merge_same_box_type_rows(boxes):
+    if not boxes:
+        return None
+
+    merged = {
+        "box_name": boxes[0]["box_name"],
+        "length": boxes[0]["length"],
+        "width": boxes[0]["width"],
+        "height": boxes[0]["height"],
+        "weight": boxes[0]["weight"],
+        "qty": sum(box["qty"] for box in boxes)
+    }
+    return merged
 
 
 def try_place_box_in_pallet(box, pallet, plan):
@@ -1068,11 +1081,13 @@ def calculate_plan(plan_id):
 
     unique_box_types = {box["box_name"] for box in boxes}
 
-    if len(unique_box_types) == 1 and len(boxes) == 1:
+    if len(unique_box_types) == 1:
+        merged_box = merge_same_box_type_rows(boxes)
+
         best_single = None
 
         for pallet_row in allowed_pallets:
-            result = single_box_type_distribution(base_plan, pallet_row, boxes[0])
+            result = single_box_type_distribution(base_plan, pallet_row, merged_box)
             if not result:
                 continue
 
