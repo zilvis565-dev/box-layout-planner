@@ -190,133 +190,6 @@ def build_plan_from_pallet(base_plan, pallet_row):
     }
 
 
-def single_box_capacity(base_plan, pallet_row, box):
-    plan = build_plan_from_pallet(base_plan, pallet_row)
-
-    effective_length = plan["pallet_length"] + 2 * plan["overhang"]
-    effective_width = plan["pallet_width"] + 2 * plan["overhang"]
-    usable_height = plan["max_load_height"] - plan["pallet_height"]
-
-    orientations = [(box["length"], box["width"])]
-    if plan["allow_rotation"] and box["length"] != box["width"]:
-        orientations.append((box["width"], box["length"]))
-
-    best = None
-
-    for bl, bw in orientations:
-        per_row = effective_length // bl
-        per_col = effective_width // bw
-        per_layer = per_row * per_col
-        layers = usable_height // box["height"] if box["height"] > 0 else 0
-
-        if per_layer <= 0 or layers <= 0:
-            continue
-
-        by_height = per_layer * layers
-        by_weight = int(plan["max_pallet_weight"] // box["weight"]) if box["weight"] > 0 else by_height
-        per_pallet = min(by_height, by_weight)
-
-        if per_pallet <= 0:
-            continue
-
-        candidate = {
-            "orientation": (bl, bw),
-            "per_row": int(per_row),
-            "per_col": int(per_col),
-            "per_layer": int(per_layer),
-            "layers": int(layers),
-            "per_pallet": int(per_pallet),
-            "effective_length": int(effective_length),
-            "effective_width": int(effective_width),
-            "usable_height": int(usable_height),
-            "pallet_type": pallet_row["name"]
-        }
-
-        if best is None or candidate["per_pallet"] > best["per_pallet"]:
-            best = candidate
-
-    return best
-
-
-def single_box_type_distribution(base_plan, pallet_row, box):
-    plan = build_plan_from_pallet(base_plan, pallet_row)
-    best = single_box_capacity(base_plan, pallet_row, box)
-    if not best:
-        return None
-
-    pallets_needed = math.ceil(box["qty"] / best["per_pallet"])
-    pallets = []
-    remaining = box["qty"]
-
-    for _ in range(pallets_needed):
-        pallet_qty = min(remaining, best["per_pallet"])
-        remaining -= pallet_qty
-
-        pallet = {
-            "boxes": [],
-            "weight": pallet_qty * box["weight"],
-            "used_height": plan["pallet_height"],
-            "layers": [],
-            "pallet_type": plan["pallet_type"],
-            "pallet_length": plan["pallet_length"],
-            "pallet_width": plan["pallet_width"],
-            "pallet_height": plan["pallet_height"],
-            "max_weight": plan["max_pallet_weight"]
-        }
-
-        bl, bw = best["orientation"]
-        qty_left = pallet_qty
-        z = plan["pallet_height"]
-
-        for _layer in range(best["layers"]):
-            if qty_left <= 0:
-                break
-
-            layer_count = min(qty_left, best["per_layer"])
-            qty_left -= layer_count
-
-            x = 0
-            y = 0
-            count = 0
-
-            for _r in range(best["per_col"]):
-                x = 0
-                for _c in range(best["per_row"]):
-                    if count >= layer_count:
-                        break
-
-                    pallet["boxes"].append({
-                        "box_name": box["box_name"],
-                        "length": box["length"],
-                        "width": box["width"],
-                        "height": box["height"],
-                        "weight": box["weight"],
-                        "placed_length": bl,
-                        "placed_width": bw,
-                        "x": x,
-                        "y": y,
-                        "z": z
-                    })
-
-                    x += bl
-                    count += 1
-
-                y += bw
-                if count >= layer_count:
-                    break
-
-            pallet["used_height"] = max(pallet["used_height"], z + box["height"])
-            z += box["height"]
-
-        pallets.append(pallet)
-
-    return {
-        "plan": plan,
-        "pallets": pallets,
-        "debug": best
-    }
-
-
 def boxes_overlap_3d(a, b):
     ax1, ay1, az1 = a["x"], a["y"], a["z"]
     ax2 = ax1 + a["placed_length"]
@@ -388,6 +261,151 @@ def merge_same_box_type_rows(boxes):
         "qty": sum(box["qty"] for box in boxes)
     }
     return merged
+
+
+def single_box_capacity(base_plan, pallet_row, box):
+    plan = build_plan_from_pallet(base_plan, pallet_row)
+
+    effective_length = plan["pallet_length"] + 2 * plan["overhang"]
+    effective_width = plan["pallet_width"] + 2 * plan["overhang"]
+    usable_height = plan["max_load_height"] - plan["pallet_height"]
+
+    orientations = [(box["length"], box["width"])]
+    if plan["allow_rotation"] and box["length"] != box["width"]:
+        orientations.append((box["width"], box["length"]))
+
+    best = None
+
+    for bl, bw in orientations:
+        per_row = effective_length // bl
+        per_col = effective_width // bw
+        per_layer = per_row * per_col
+        layers = usable_height // box["height"] if box["height"] > 0 else 0
+
+        if per_row <= 0 or per_col <= 0 or per_layer <= 0 or layers <= 0:
+            continue
+
+        by_height = per_layer * layers
+        by_weight = int(plan["max_pallet_weight"] // box["weight"]) if box["weight"] > 0 else by_height
+        per_pallet = min(by_height, by_weight)
+
+        if per_pallet <= 0:
+            continue
+
+        candidate = {
+            "orientation": (bl, bw),
+            "per_row": int(per_row),
+            "per_col": int(per_col),
+            "per_layer": int(per_layer),
+            "layers": int(layers),
+            "per_pallet": int(per_pallet),
+            "effective_length": int(effective_length),
+            "effective_width": int(effective_width),
+            "usable_height": int(usable_height),
+            "pallet_type": pallet_row["name"]
+        }
+
+        if best is None or candidate["per_pallet"] > best["per_pallet"]:
+            best = candidate
+
+    return best
+
+
+def solve_single_box_type_strict(base_plan, allowed_pallets, merged_box):
+    best_result = None
+
+    for pallet_row in allowed_pallets:
+        cap = single_box_capacity(base_plan, pallet_row, merged_box)
+        if not cap:
+            continue
+
+        plan = build_plan_from_pallet(base_plan, pallet_row)
+        qty = merged_box["qty"]
+        pallets_needed = math.ceil(qty / cap["per_pallet"])
+
+        pallets = []
+        remaining = qty
+
+        for _ in range(pallets_needed):
+            pallet_qty = min(remaining, cap["per_pallet"])
+            remaining -= pallet_qty
+
+            pallet = {
+                "boxes": [],
+                "weight": pallet_qty * merged_box["weight"],
+                "used_height": plan["pallet_height"],
+                "layers": [],
+                "pallet_type": plan["pallet_type"],
+                "pallet_length": plan["pallet_length"],
+                "pallet_width": plan["pallet_width"],
+                "pallet_height": plan["pallet_height"],
+                "max_weight": plan["max_pallet_weight"]
+            }
+
+            bl, bw = cap["orientation"]
+            z = plan["pallet_height"]
+            qty_left = pallet_qty
+
+            for _layer in range(cap["layers"]):
+                if qty_left <= 0:
+                    break
+
+                for row in range(cap["per_col"]):
+                    for col in range(cap["per_row"]):
+                        if qty_left <= 0:
+                            break
+
+                        x = col * bl
+                        y = row * bw
+
+                        candidate_box = {
+                            "box_name": merged_box["box_name"],
+                            "length": merged_box["length"],
+                            "width": merged_box["width"],
+                            "height": merged_box["height"],
+                            "weight": merged_box["weight"],
+                            "placed_length": bl,
+                            "placed_width": bw,
+                            "x": x,
+                            "y": y,
+                            "z": z
+                        }
+
+                        if not fits_within_bounds(candidate_box, plan):
+                            continue
+
+                        if collides_with_existing(candidate_box, pallet["boxes"]):
+                            continue
+
+                        pallet["boxes"].append(candidate_box)
+                        qty_left -= 1
+
+                    if qty_left <= 0:
+                        break
+
+                pallet["used_height"] = max(pallet["used_height"], z + merged_box["height"])
+                z += merged_box["height"]
+
+            pallets.append(pallet)
+
+        result = {
+            "plan": plan,
+            "pallets": pallets,
+            "debug": cap
+        }
+
+        if best_result is None:
+            best_result = result
+        else:
+            current_count = len(result["pallets"])
+            best_count = len(best_result["pallets"])
+
+            if current_count < best_count:
+                best_result = result
+            elif current_count == best_count and cap["per_pallet"] > best_result["debug"]["per_pallet"]:
+                best_result = result
+
+    return best_result
 
 
 def try_place_box_in_pallet(box, pallet, plan):
@@ -639,18 +657,14 @@ def calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes):
         remainder = box_row["qty"] % cap
 
         if full_pallet_count > 0:
-            result = single_box_type_distribution(
-                base_plan,
-                best_pallet_row,
-                {
-                    "box_name": box_row["box_name"],
-                    "length": box_row["length"],
-                    "width": box_row["width"],
-                    "height": box_row["height"],
-                    "weight": box_row["weight"],
-                    "qty": full_pallet_count * cap
-                }
-            )
+            result = solve_single_box_type_strict(base_plan, [best_pallet_row], {
+                "box_name": box_row["box_name"],
+                "length": box_row["length"],
+                "width": box_row["width"],
+                "height": box_row["height"],
+                "weight": box_row["weight"],
+                "qty": full_pallet_count * cap
+            })
             if result:
                 pallets.extend(result["pallets"])
 
@@ -1089,33 +1103,15 @@ def calculate_plan(plan_id):
 
     if len(unique_box_types) == 1:
         merged_box = merge_same_box_type_rows(boxes)
+        strict_result = solve_single_box_type_strict(base_plan, allowed_pallets, merged_box)
 
-        best_single = None
-        best_debug = None
-
-        for pallet_row in allowed_pallets:
-            result = single_box_type_distribution(base_plan, pallet_row, merged_box)
-            if not result:
-                continue
-
-            pallet_count = len(result["pallets"])
-            if best_single is None or pallet_count < len(best_single["pallets"]):
-                best_single = result
-                best_debug = result["debug"]
-            elif best_single is not None and pallet_count == len(best_single["pallets"]):
-                current_cap = len(result["pallets"][0]["boxes"]) if result["pallets"] else 0
-                best_cap = len(best_single["pallets"][0]["boxes"]) if best_single["pallets"] else 0
-                if current_cap > best_cap:
-                    best_single = result
-                    best_debug = result["debug"]
-
-        if best_single:
-            selected_plan = best_single["plan"]
-            pallets = best_single["pallets"]
-            single_box_debug = best_debug
+        if strict_result:
+            selected_plan = strict_result["plan"]
+            pallets = strict_result["pallets"]
+            single_box_debug = strict_result["debug"]
         else:
-            pallets = []
             selected_plan = base_plan
+            pallets = []
     else:
         pallets = calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes)
         selected_plan = base_plan
