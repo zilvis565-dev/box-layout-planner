@@ -24,6 +24,16 @@ DEFAULT_PALLETS = [
     {"name": "FIN 1200 x 1000", "length": 1200, "width": 1000, "height": 150, "max_weight": 700},
     {"name": "US 1219 x 1016", "length": 1219, "width": 1016, "height": 150, "max_weight": 700},
     {"name": "Half pallet 800 x 600", "length": 800, "width": 600, "height": 150, "max_weight": 300},
+    {"name": "1200 x 1050", "length": 1200, "width": 1050, "height": 150, "max_weight": 700},
+    {"name": "1200 x 950", "length": 1200, "width": 950, "height": 150, "max_weight": 700},
+    {"name": "1500 x 1100", "length": 1500, "width": 1100, "height": 150, "max_weight": 1000},
+]
+
+DEFAULT_BOXES = [
+    {"name": "1160x450x450", "length": 1160, "width": 450, "height": 450, "weight": 1.0},
+    {"name": "710x430x270", "length": 710, "width": 430, "height": 270, "weight": 1.0},
+    {"name": "1210x450x330", "length": 1210, "width": 450, "height": 330, "weight": 1.0},
+    {"name": "800x470x290", "length": 800, "width": 470, "height": 290, "weight": 1.0},
 ]
 
 LOADING_TARGETS = [
@@ -119,6 +129,23 @@ def init_db():
                 pallet["width"],
                 pallet["height"],
                 pallet["max_weight"]
+            ))
+
+    for box in DEFAULT_BOXES:
+        existing = c.execute("""
+            SELECT id FROM box_library WHERE name = ?
+        """, (box["name"],)).fetchone()
+
+        if not existing:
+            c.execute("""
+                INSERT INTO box_library (name, length, width, height, weight)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                box["name"],
+                box["length"],
+                box["width"],
+                box["height"],
+                box["weight"]
             ))
 
     conn.commit()
@@ -629,6 +656,27 @@ def create_3d_plot(pallet, base_plan):
     color_map = {}
     legend = []
 
+    px = 0
+    py = 0
+    pz = 0
+    pl = plan["pallet_length"]
+    pw = plan["pallet_width"]
+    ph = plan["pallet_height"]
+
+    fig.add_trace(go.Mesh3d(
+        x=[px, px+pl, px+pl, px, px, px+pl, px+pl, px],
+        y=[py, py, py+pw, py+pw, py, py, py+pw, py+pw],
+        z=[pz, pz, pz, pz, pz+ph, pz+ph, pz+ph, pz+ph],
+        i=[0, 0, 0, 1, 4, 4, 5, 2, 6, 3, 7, 1],
+        j=[1, 2, 3, 2, 5, 6, 6, 3, 7, 0, 4, 5],
+        k=[2, 3, 1, 0, 6, 7, 1, 0, 3, 4, 5, 6],
+        opacity=0.35,
+        color="#9ca3af",
+        flatshading=True,
+        name="Pallet",
+        showscale=False
+    ))
+
     for box in pallet["boxes"]:
         if box["box_name"] not in color_map:
             color_map[box["box_name"]] = BOX_COLORS[len(color_map) % len(BOX_COLORS)]
@@ -653,22 +701,32 @@ def create_3d_plot(pallet, base_plan):
             i=[0, 0, 0, 1, 4, 4, 5, 2, 6, 3, 7, 1],
             j=[1, 2, 3, 2, 5, 6, 6, 3, 7, 0, 4, 5],
             k=[2, 3, 1, 0, 6, 7, 1, 0, 3, 4, 5, 6],
-            opacity=0.9,
+            opacity=0.92,
             color=color,
             flatshading=True,
             name=box["box_name"],
             showscale=False
         ))
 
+    max_dim = max(plan["pallet_length"], plan["pallet_width"], plan["max_load_height"])
+
     fig.update_layout(
         scene=dict(
             xaxis_title="Length",
             yaxis_title="Width",
             zaxis_title="Height",
-            xaxis=dict(range=[0, plan["pallet_length"] + 2 * plan["overhang"]]),
-            yaxis=dict(range=[0, plan["pallet_width"] + 2 * plan["overhang"]]),
+            xaxis=dict(range=[0, plan["pallet_length"]]),
+            yaxis=dict(range=[0, plan["pallet_width"]]),
             zaxis=dict(range=[0, plan["max_load_height"]]),
-            aspectmode="data",
+            aspectmode="manual",
+            aspectratio=dict(
+                x=plan["pallet_length"] / max_dim,
+                y=plan["pallet_width"] / max_dim,
+                z=plan["max_load_height"] / max_dim
+            ),
+            camera=dict(
+                eye=dict(x=1.7, y=1.5, z=1.1)
+            ),
             bgcolor="rgba(0,0,0,0)"
         ),
         margin=dict(l=0, r=0, t=20, b=0),
