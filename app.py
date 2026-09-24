@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import copy
 import math
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = "box-layout-secret"
@@ -162,7 +163,7 @@ def build_plan_from_pallet(base_plan, pallet_row):
     }
 
 
-def single_box_type_distribution(base_plan, pallet_row, box):
+def single_box_capacity(base_plan, pallet_row, box):
     plan = build_plan_from_pallet(base_plan, pallet_row)
 
     effective_length = plan["pallet_length"] + 2 * plan["overhang"]
@@ -191,28 +192,32 @@ def single_box_type_distribution(base_plan, pallet_row, box):
         if per_pallet <= 0:
             continue
 
-        pallets_needed = math.ceil(box["qty"] / per_pallet)
-
         candidate = {
             "orientation": (bl, bw),
             "per_row": int(per_row),
             "per_col": int(per_col),
             "per_layer": int(per_layer),
             "layers": int(layers),
-            "per_pallet": int(per_pallet),
-            "pallets_needed": int(pallets_needed)
+            "per_pallet": int(per_pallet)
         }
 
         if best is None or candidate["per_pallet"] > best["per_pallet"]:
             best = candidate
 
+    return best
+
+
+def single_box_type_distribution(base_plan, pallet_row, box):
+    plan = build_plan_from_pallet(base_plan, pallet_row)
+    best = single_box_capacity(base_plan, pallet_row, box)
     if not best:
         return None
 
+    pallets_needed = math.ceil(box["qty"] / best["per_pallet"])
     pallets = []
     remaining = box["qty"]
 
-    for _ in range(best["pallets_needed"]):
+    for _ in range(pallets_needed):
         pallet_qty = min(remaining, best["per_pallet"])
         remaining -= pallet_qty
 
@@ -456,11 +461,102 @@ def choose_best_new_pallet_for_box(box, base_plan, allowed_pallets):
     return best
 
 
-def calculate_mixed_pallet_distribution(base_plan, allowed_pallets, boxes):
-    expanded_boxes = expand_boxes(boxes)
-    pallets = []
+def choose_best_pallet_for_box_type(base_plan, allowed_pallets, box_row):
+    best = None
+    for pallet_row in allowed_pallets:
+        cap = single_box_capacity(base_plan, pallet_row, box_row)
+        if not cap:
+            continue
 
-    for box in expanded_boxes:
+        score = cap["per_pallet"]
+        candidate = {
+            "pallet_row": pallet_row,
+            "capacity": cap,
+            "score": score
+        }
+
+        if best is None or candidate["score"] > best["score"]:
+            best = candidate
+
+    return best
+
+
+def calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes):
+    grouped = defaultdict(lambda: {
+        "box_name": "",
+        "length": 0,
+        "width": 0,
+        "height": 0,
+        "weight": 0,
+        "qty": 0
+    })
+
+    for b in boxes:
+        grouped[b["box_name"]]["box_name"] = b["box_name"]
+        grouped[b["box_name"]]["length"] = b["length"]
+        grouped[b["box_name"]]["width"] = b["width"]
+        grouped[b["box_name"]]["height"] = b["height"]
+        grouped[b["box_name"]]["weight"] = b["weight"]
+        grouped[b["box_name"]]["qty"] += b["qty"]
+
+    grouped_boxes = sorted(
+        grouped.values(),
+        key=lambda x: (x["length"] * x["width"], x["qty"], x["weight"]),
+        reverse=True
+    )
+
+    pallets = []
+    leftovers = []
+
+    # 1 fazė: pagrindiniai kiekiai pagal geriausią pallet tipą kiekvienam box tipui
+    for box_row in grouped_boxes:
+        best_choice = choose_best_pallet_for_box_type(base_plan, allowed_pallets, box_row)
+
+        if not best_choice:
+            leftovers.append(box_row)
+            continue
+
+        best_pallet_row = best_choice["pallet_row"]
+        cap = best_choice["capacity"]["per_pallet"]
+
+        if cap <= 0:
+            leftovers.append(box_row)
+            continue
+
+        # pilni pallet'ai šitam box tipui
+        full_pallet_count = box_row["qty"] // cap
+        remainder = box_row["qty"] % cap
+
+        if full_pallet_count > 0:
+            result = single_box_type_distribution(
+                base_plan,
+                best_pallet_row,
+                {
+                    "box_name": box_row["box_name"],
+                    "length": box_row["length"],
+                    "width": box_row["width"],
+                    "height": box_row["height"],
+                    "weight": box_row["weight"],
+                    "qty": full_pallet_count * cap
+                }
+            )
+            if result:
+                pallets.extend(result["pallets"])
+
+        if remainder > 0:
+            leftovers.append({
+                "box_name": box_row["box_name"],
+                "length": box_row["length"],
+                "width": box_row["width"],
+                "height": box_row["height"],
+                "weight": box_row["weight"],
+                "qty": remainder
+            })
+
+    # 2 fazė: likučius bandyti jungti mišriai
+    expanded_leftovers = expand_boxes(leftovers)
+
+    for box in expanded_leftovers:
         best_existing_index = None
         best_existing_score = -1
 
@@ -836,13 +932,11 @@ def calculate_plan(plan_id):
             pallets = []
             selected_plan = base_plan
     else:
-        pallets = calculate_mixed_pallet_distribution(base_plan, allowed_pallets, boxes)
+        pallets = calculate_mixed_pallet_distribution_v2(base_plan, allowed_pallets, boxes)
         selected_plan = base_plan
 
     pallet_summaries = []
     editable_summary = []
-
-    serialized_pallets = []
 
     for idx, pallet in enumerate(pallets, start=1):
         grouped = {}
@@ -856,6 +950,7 @@ def calculate_plan(plan_id):
             "pallet_type": pallet["pallet_type"]
         })
 
+        plot_html, legend = create_3d_plot(pallet, selected_plan)
         base_util, volume_util = base_and_volume_utilization(pallet, selected_plan)
 
         pallet_summaries.append({
@@ -865,16 +960,13 @@ def calculate_plan(plan_id):
             "used_height": pallet["used_height"],
             "box_count": len(pallet["boxes"]),
             "grouped_boxes": grouped,
-            "legend": [],
+            "plot_html": plot_html,
+            "legend": legend,
             "base_layer_utilization": base_util,
             "volume_utilization": volume_util
         })
 
-        serialized_pallets.append(copy.deepcopy(pallet))
-
     session["editable_layout"] = editable_summary
-    session["last_calculated_pallets"] = serialized_pallets
-    session["last_selected_plan"] = dict(selected_plan)
 
     return render_template(
         "calculation_result.html",
@@ -882,28 +974,6 @@ def calculate_plan(plan_id):
         plan_id=plan_id,
         total_pallets=len(pallets),
         pallet_summaries=pallet_summaries
-    )
-
-
-@app.route("/pallet-3d/<int:plan_id>/<int:pallet_index>")
-def pallet_3d(plan_id, pallet_index):
-    pallets = session.get("last_calculated_pallets", [])
-    selected_plan = session.get("last_selected_plan")
-
-    if not selected_plan or pallet_index < 1 or pallet_index > len(pallets):
-        return redirect(url_for("plan_detail", plan_id=plan_id))
-
-    pallet = pallets[pallet_index - 1]
-    plot_html, legend = create_3d_plot(pallet, selected_plan)
-
-    return render_template(
-        "pallet_3d.html",
-        plan=selected_plan,
-        plan_id=plan_id,
-        pallet_index=pallet_index,
-        pallet=pallet,
-        plot_html=plot_html,
-        legend=legend
     )
 
 
