@@ -24,7 +24,7 @@
         <div class="card" style="padding:16px; margin-bottom:16px;">
             {% for pallet in pallet_library %}
             <label style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                <input type="checkbox" name="allowed_pallets" value="{{ pallet.id }}" {% if loop.first %}checked{% endif %}>
+                <input type="checkbox" name="allowed_pallets" value="{{ pallet.id }}" {% if loop.first or pallet.name in ["EUR 1200 x 800", "1200 x 1050", "1200 x 950", "1500 x 1100"] %}checked{% endif %}>
                 <span>
                     {{ pallet.name }} —
                     {{ pallet.length }} x {{ pallet.width }} x {{ pallet.height }},
