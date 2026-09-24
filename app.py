@@ -225,7 +225,11 @@ def single_box_capacity(base_plan, pallet_row, box):
             "per_col": int(per_col),
             "per_layer": int(per_layer),
             "layers": int(layers),
-            "per_pallet": int(per_pallet)
+            "per_pallet": int(per_pallet),
+            "effective_length": int(effective_length),
+            "effective_width": int(effective_width),
+            "usable_height": int(usable_height),
+            "pallet_type": pallet_row["name"]
         }
 
         if best is None or candidate["per_pallet"] > best["per_pallet"]:
@@ -308,7 +312,8 @@ def single_box_type_distribution(base_plan, pallet_row, box):
 
     return {
         "plan": plan,
-        "pallets": pallets
+        "pallets": pallets,
+        "debug": best
     }
 
 
@@ -1080,11 +1085,13 @@ def calculate_plan(plan_id):
     conn.close()
 
     unique_box_types = {box["box_name"] for box in boxes}
+    single_box_debug = None
 
     if len(unique_box_types) == 1:
         merged_box = merge_same_box_type_rows(boxes)
 
         best_single = None
+        best_debug = None
 
         for pallet_row in allowed_pallets:
             result = single_box_type_distribution(base_plan, pallet_row, merged_box)
@@ -1094,15 +1101,18 @@ def calculate_plan(plan_id):
             pallet_count = len(result["pallets"])
             if best_single is None or pallet_count < len(best_single["pallets"]):
                 best_single = result
+                best_debug = result["debug"]
             elif best_single is not None and pallet_count == len(best_single["pallets"]):
                 current_cap = len(result["pallets"][0]["boxes"]) if result["pallets"] else 0
                 best_cap = len(best_single["pallets"][0]["boxes"]) if best_single["pallets"] else 0
                 if current_cap > best_cap:
                     best_single = result
+                    best_debug = result["debug"]
 
         if best_single:
             selected_plan = best_single["plan"]
             pallets = best_single["pallets"]
+            single_box_debug = best_debug
         else:
             pallets = []
             selected_plan = base_plan
@@ -1152,7 +1162,8 @@ def calculate_plan(plan_id):
         plan=selected_plan,
         plan_id=plan_id,
         total_pallets=len(pallets),
-        pallet_summaries=pallet_summaries
+        pallet_summaries=pallet_summaries,
+        single_box_debug=single_box_debug
     )
 
 
