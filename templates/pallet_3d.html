@@ -1,1 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Pallet 3D{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h1>Pallet {{ pallet_index }} - 3D View</h1>
+            <p class="subtitle">Pallet type: {{ pallet.pallet_type }}</p>
+        </div>
+        <a href="{{ url_for('calculate_plan', plan_id=plan_id) }}" class="btn secondary">Back</a>
+    </div>
+
+    <div class="legend">
+        {% for item in legend %}
+        <div class="legend-item">
+            <span class="legend-color" data-color="{{ item.color }}"></span>
+            <span>{{ item.name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="plot-container">
+        {{ plot_html|safe }}
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.legend-color').forEach(el => {
+    el.style.background = el.dataset.color;
+});
+</script>
+{% endblock %}
 
