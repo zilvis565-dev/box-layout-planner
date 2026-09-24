@@ -31,6 +31,14 @@
         </div>
     </div>
 
+    {% if overlaps and overlaps|length > 0 %}
+    <div class="card" style="margin-top:20px; border:1px solid #ef4444;">
+        <h2>Overlap warning</h2>
+        <p>Detected overlaps: <strong>{{ overlaps|length }}</strong></p>
+        <p>Boxes involved in overlap are highlighted in red in the 3D view.</p>
+    </div>
+    {% endif %}
+
     <div class="legend">
         {% for item in legend %}
         <div class="legend-item">
