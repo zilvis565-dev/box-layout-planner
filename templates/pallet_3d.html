@@ -12,6 +12,25 @@
         <a href="{{ url_for('calculate_plan', plan_id=plan_id) }}" class="btn secondary">Back</a>
     </div>
 
+    <div class="totals-box">
+        <div class="total-item">
+            <span class="total-label">Boxes</span>
+            <span class="total-value">{{ pallet.boxes|length }}</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Weight</span>
+            <span class="total-value">{{ pallet.weight }} kg</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Used height</span>
+            <span class="total-value">{{ pallet.used_height }} mm</span>
+        </div>
+        <div class="total-item">
+            <span class="total-label">Pallet type</span>
+            <span class="total-value">{{ pallet.pallet_type }}</span>
+        </div>
+    </div>
+
     <div class="legend">
         {% for item in legend %}
         <div class="legend-item">
