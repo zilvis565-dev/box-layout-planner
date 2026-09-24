@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import copy
 import math
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = "box-layout-secret"
