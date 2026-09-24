@@ -50,17 +50,10 @@
                 {% endfor %}
             </table>
 
-            <div class="legend">
-                {% for item in pallet.legend %}
-                <div class="legend-item">
-                    <span class="legend-color" data-color="{{ item.color }}"></span>
-                    <span>{{ item.name }}</span>
-                </div>
-                {% endfor %}
-            </div>
-
-            <div class="plot-container">
-                {{ pallet.plot_html|safe }}
+            <div style="margin-top:16px;">
+                <a href="{{ url_for('pallet_3d', plan_id=plan_id, pallet_index=pallet.index) }}" class="btn">
+                    View 3D
+                </a>
             </div>
         </div>
         {% endfor %}
@@ -68,10 +61,4 @@
         <button type="submit" class="btn full" style="margin-top:20px;">Save edited layout</button>
     </form>
 </div>
-
-<script>
-document.querySelectorAll('.legend-color').forEach(el => {
-    el.style.background = el.dataset.color;
-});
-</script>
 {% endblock %}
